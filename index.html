@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>JS RPG - Battle Transition</title>
+    <title>JS RPG - Pixel Rain Battle</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { position: absolute; }
@@ -25,36 +25,59 @@
         const tileSize = 16;
         const keys = {};
 
-        // --- LEVELS ---
+        // --- LEVEL DEFINITIONS ---
         const levels = {
             town: {
-                map: [[1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,1,1,1,1,1,1,1,1]],
-                npc: { x: 7, y: 2, color: '#3498db', msg: "Press 'B' to simulate a battle start!" },
+                map: [
+                    [1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,1], // Warp door at x4, y4
+                    [1,1,1,1,1,1,1,1,1]
+                ],
+                npc: { x: 7, y: 2, color: '#3498db', msg: "Press 'B' to start the Pixel Rain battle!" },
                 warps: [{ x: 4, y: 4, to: 'house', tx: 4, ty: 4 }],
                 chests: []
             },
             house: {
-                map: [[1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,1,1,1,1,1,1,1,1]],
-                npc: { x: 2, y: 2, color: '#9b59b6', msg: "Did you find my sword?" },
+                map: [
+                    [1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,0,1,1,1,1] // Exit rug at x4, y5
+                ],
+                npc: { x: 2, y: 1, color: '#9b59b6', msg: "It's cozy in here." },
                 warps: [{ x: 4, y: 5, to: 'town', tx: 4, ty: 5 }],
                 chests: [{ x: 6, y: 2, opened: false, item: "Rusty Sword", color: "#d35400" }]
             }
         };
 
         // --- STATE ---
-        let gameState = 'EXPLORE'; // EXPLORE, TRANSITION, BATTLE
+        let gameState = 'EXPLORE'; 
         let currentKey = 'town';
         let level = levels[currentKey];
         let fade = 0, isWarping = false, warpData = null;
-        let battleAnim = 0; // For the swirl effect
         let time = 0, shake = 0, parts = [];
         let dialogue = false, diagMsg = "";
         let isAutoTime = true, manualNight = 0;
+
+        // --- PIXEL RAIN STATE ---
+        let rainGrid = [];
+        const RAIN_BLOCK_SIZE = 30; 
 
         const player = { gx: 2, gy: 2, rx: 32, ry: 32, s: 0.18, anim: 0, color: '#e74c3c' };
 
         function initParts() {
             parts = Array.from({length: 30}, () => ({ x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight, v: 0.2 + Math.random() * 0.5 }));
+        }
+
+        function initRainGrid() {
+            const cols = Math.ceil(uiCanvas.width / RAIN_BLOCK_SIZE);
+            const rows = Math.ceil(uiCanvas.height / RAIN_BLOCK_SIZE);
+            rainGrid = Array(cols * rows).fill(0);
         }
 
         function resize() {
@@ -65,6 +88,7 @@
             ctx.imageSmoothingEnabled = false;
             [canvas, uiCanvas].forEach(c => { c.style.width = `${w}px`; c.style.height = `${h}px`; });
             initParts();
+            if (gameState === 'TRANSITION') initRainGrid();
         }
 
         window.addEventListener('resize', resize);
@@ -72,9 +96,12 @@
             const k = e.key.toLowerCase();
             keys[k] = true;
             if (k === 'n') { isAutoTime = !isAutoTime; if(!isAutoTime) manualNight = (Math.sin(time) > 0) ? 0 : 1; }
-            if (k === 'b' && gameState === 'EXPLORE') startBattle(); // Manual trigger
-            
-            if (k === 'e' && !isWarping) {
+            if (k === 'b' && gameState === 'EXPLORE') {
+                gameState = 'TRANSITION';
+                initRainGrid();
+                dialogue = false;
+            }
+            if (k === 'e' && !isWarping && gameState === 'EXPLORE') {
                 if (dialogue) { dialogue = false; return; }
                 const dNPC = Math.abs(player.gx - level.npc.x) + Math.abs(player.gy - level.npc.y);
                 if (dNPC === 1) { diagMsg = level.npc.msg; dialogue = true; shake = 3; return; }
@@ -87,23 +114,20 @@
         });
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-        function startBattle() {
-            gameState = 'TRANSITION';
-            battleAnim = 0;
-            dialogue = false;
-        }
-
         function update() {
             if (gameState === 'TRANSITION') {
-                battleAnim += 0.02;
-                if (battleAnim >= 1.5) {
+                // Fill 15 blocks per frame
+                for(let i = 0; i < 15; i++) {
+                    let idx = Math.floor(Math.random() * rainGrid.length);
+                    rainGrid[idx] = 1;
+                }
+                if (rainGrid.every(cell => cell === 1)) {
                     gameState = 'BATTLE';
-                    battleAnim = 0;
                 }
                 return;
             }
 
-            if (gameState === 'BATTLE') return; // Battle logic goes here later
+            if (gameState === 'BATTLE') return;
 
             if (isAutoTime) time += 0.005;
             else time += ((manualNight === 1 ? Math.PI/2 : -Math.PI/2) - time) * 0.05;
@@ -125,7 +149,6 @@
             if (atTarget) {
                 const w = level.warps.find(wp => wp.x === player.gx && wp.y === player.gy);
                 if (w) { isWarping = true; warpData = w; return; }
-
                 if (!dialogue) {
                     let nx = player.gx, ny = player.gy;
                     if (keys['w']) ny--; else if (keys['s']) ny++; else if (keys['a']) nx--; else if (keys['d']) nx++;
@@ -145,12 +168,10 @@
             update();
             
             if (gameState === 'BATTLE') {
-                ctx.fillStyle = '#002'; // Battle Arena Background
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                uiCtx.fillStyle = 'white';
-                uiCtx.font = '30px serif';
-                uiCtx.fillText("BATTLE BEGINS", 100, 100);
-                uiCtx.fillText("Press F5 to restart for now!", 100, 150);
+                ctx.fillStyle = '#002'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                uiCtx.fillStyle = 'white'; uiCtx.font = '30px serif';
+                uiCtx.fillText("BATTLE SCREEN", 100, 100);
+                uiCtx.fillText("Press F5 to Restart", 100, 150);
                 return;
             }
 
@@ -185,12 +206,17 @@
                 uiCtx.fillStyle='#eee'; uiCtx.font='italic 22px serif'; uiCtx.fillText(diagMsg, 100, uiCanvas.height-100);
             }
 
-            // --- BATTLE TRANSITION SWIRL ---
+            // --- PIXEL RAIN TRANSITION ---
             if (gameState === 'TRANSITION') {
                 uiCtx.fillStyle = 'black';
-                uiCtx.beginPath();
-                uiCtx.arc(uiCanvas.width/2, uiCanvas.height/2, battleAnim * uiCanvas.width, 0, Math.PI * 2);
-                uiCtx.fill();
+                const cols = Math.ceil(uiCanvas.width / RAIN_BLOCK_SIZE);
+                rainGrid.forEach((cell, i) => {
+                    if (cell === 1) {
+                        const x = (i % cols) * RAIN_BLOCK_SIZE;
+                        const y = Math.floor(i / cols) * RAIN_BLOCK_SIZE;
+                        uiCtx.fillRect(x, y, RAIN_BLOCK_SIZE, RAIN_BLOCK_SIZE);
+                    }
+                });
             }
 
             if (fade > 0) { uiCtx.fillStyle = `rgba(0,0,0,${fade})`; uiCtx.fillRect(0,0,uiCanvas.width,uiCanvas.height); }
