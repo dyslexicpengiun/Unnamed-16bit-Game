@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>JS RPG - Loot & Movement Fix</title>
+    <title>JS RPG - Dialogue Fix</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { position: absolute; }
@@ -25,15 +25,16 @@
         const tileSize = 16;
         const keys = {};
 
+        // --- LEVELS ---
         const levels = {
             town: {
                 map: [
-                   [1,1,1,1,1,1,1,1,1],
-                   [1,0,0,0,0,0,0,0,1],
-                   [1,0,0,0,0,0,0,0,1],
-                   [1,0,0,0,0,0,0,0,1],
-                   [1,1,1,1,0,1,1,1,1],
-                   [1,0,0,0,0,0,0,0,1]
+                  [1,1,1,1,1,1,1,1,1,1],
+                  [1,0,0,0,0,0,0,0,0,1],
+                  [1,0,0,0,0,0,0,0,0,1],
+                  [1,0,0,0,0,0,0,0,0,1],
+                  [1,0,0,0,0,0,0,0,0,1],
+                  [1,1,1,1,1,1,1,1,1,1]
                 ],
                 npc: { x: 7, y: 2, color: '#3498db', msg: "Check the house for supplies!" },
                 warps: [{ x: 4, y: 4, to: 'house', tx: 4, ty: 4 }],
@@ -41,12 +42,12 @@
             },
             house: {
                 map: [
-                   [1,1,1,1,1,1,1,1,1],
-                   [1,0,0,0,0,0,0,0,1],
-                   [1,0,0,0,0,0,0,0,1],
-                   [1,0,0,0,0,0,0,0,1],
-                   [1,0,0,0,0,0,0,0,1],
-                   [1,1,1,1,0,1,1,1,1]
+                  [1,1,1,1,1,1,1,1,1,1],
+                  [1,0,0,0,0,0,0,0,0,1],
+                  [1,0,0,0,0,0,0,0,0,1],
+                  [1,0,0,0,0,0,0,0,0,1],
+                  [1,0,0,0,0,0,0,0,0,1],
+                  [1,1,1,1,1,1,1,1,1,1]
                 ],
                 npc: { x: 2, y: 2, color: '#9b59b6', msg: "Did you find my sword?" },
                 warps: [{ x: 4, y: 5, to: 'town', tx: 4, ty: 5 }],
@@ -85,13 +86,13 @@
             if (k === 'n') { isAutoTime = !isAutoTime; if(!isAutoTime) manualNight = (Math.sin(time) > 0) ? 0 : 1; }
             
             if (k === 'e' && !isWarping) {
-                // UNIVERSAL TOGGLE: If dialogue is open, close it and stop.
+                // 1. PRIORITY: CLOSE DIALOGUE
                 if (dialogue) {
                     dialogue = false;
                     return;
                 }
 
-                // Check NPC
+                // 2. CHECK NPC
                 const dNPC = Math.abs(player.gx - level.npc.x) + Math.abs(player.gy - level.npc.y);
                 if (dNPC === 1) { 
                     diagMsg = level.npc.msg; 
@@ -100,7 +101,7 @@
                     return;
                 }
 
-                // Check Chests
+                // 3. CHECK CHESTS
                 level.chests.forEach(c => {
                     const dC = Math.abs(player.gx - c.x) + Math.abs(player.gy - c.y);
                     if (dC === 1 && !c.opened) {
@@ -170,7 +171,8 @@
             }));
 
             const pY = player.ry - Math.abs(Math.sin(player.anim)) * 3;
-            const ents = [{x:player.rx, y:pY, c:player.color}, {x:level.npc.x*16, y:level.npc.y*16 - Math.sin(Date.now()/600)*0.5, c:level.npc.color}];
+            const nY = level.npc.y * 16 - Math.sin(Date.now()/600)*0.5;
+            const ents = [{x:player.rx, y:pY, c:player.color}, {x:level.npc.x*16, y:nY, c:level.npc.color}];
             level.chests.forEach(c => ents.push({x: c.x*16, y: c.y*16, c: c.color}));
             ents.sort((a,b)=>a.y-b.y).forEach(e => { ctx.fillStyle = e.c; ctx.fillRect(Math.round(e.x-rx), Math.round(e.y-ry), 16, 16); });
 
