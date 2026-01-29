@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>JS RPG - Fixed Warps</title>
+    <title>JS RPG - Warp Fix</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { position: absolute; }
@@ -25,30 +25,31 @@
         const tileSize = 16;
         const keys = {};
 
+        // --- LEVELS ---
         const levels = {
             town: {
                 map: [
-                    [1,1,1,1,1,1,1,1,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,1], // Door at 4,4
-                    [1,1,1,1,1,1,1,1,1]
+                   ,
+                   ,
+                   ,
+                   ,
+                   , // Warp at 4,4
+                   ,
                 ],
-                npc: { x: 7, y: 2, color: '#3498db', msg: "Walk into the blue door to enter!" },
-                warps: [{ x: 4, y: 4, to: 'house', tx: 4, ty: 3 }]
+                npc: { x: 7, y: 2, color: '#3498db', msg: "The blue door leads to the house!" },
+                warps: [{ x: 4, y: 4, to: 'house', tx: 4, ty: 4 }] // Leads to house inner
             },
             house: {
                 map: [
-                    [1,1,1,1,1,1,1,1,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,1,1,1,0,1,1,1,1], // Exit at 4,3
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,1,1,1,1,1,1,1,1]
+                   ,
+                   ,
+                   ,
+                   ,
+                   , // Warp at 4,5
+                   ,
                 ],
-                npc: { x: 2, y: 1, color: '#9b59b6', msg: "Step on the blue rug to leave." },
-                warps: [{ x: 4, y: 3, to: 'town', tx: 4, ty: 3 }] 
+                npc: { x: 2, y: 2, color: '#9b59b6', msg: "Step on the blue rug to leave." },
+                warps: [{ x: 4, y: 5, to: 'town', tx: 4, ty: 5 }] // Leads to town landing
             }
         };
 
@@ -60,7 +61,6 @@
         let isAutoTime = true;
         let manualNight = 0;
 
-        // Player spawns at y=2 in town (away from the door)
         const player = { gx: 2, gy: 2, rx: 32, ry: 32, s: 0.18, anim: 0, color: '#e74c3c' };
 
         function initParts() {
@@ -104,37 +104,44 @@
             parts.forEach(p => { p.y -= p.v; if (p.y < -10) p.y = uiCanvas.height + 10; });
 
             if (isWarping) {
-                fade += 0.06; // Faster fade
+                fade += 0.08; 
                 if (fade >= 1) {
+                    // THE CRITICAL FIX: Update currentKey first
                     currentKey = warpData.to;
                     level = levels[currentKey];
+                    
+                    // Set player's NEW logical grid position
                     player.gx = warpData.tx; 
                     player.gy = warpData.ty;
-                    // Offset spawn slightly away from the warp tile to prevent immediate re-warp
-                    if (currentKey === 'town') player.gy = warpData.ty - 1; 
-                    if (currentKey === 'house') player.gy = warpData.ty + 1;
-
+                    
+                    // Instant-snap visual position
                     player.rx = player.gx * 16; 
                     player.ry = player.gy * 16;
-                    isWarping = false; dialogue = false;
+                    
+                    isWarping = false; 
+                    dialogue = false;
                 }
                 return;
-            } else if (fade > 0) fade -= 0.06;
+            } else if (fade > 0) fade -= 0.08;
 
-            // Movement logic
             const atTarget = Math.abs(player.rx - player.gx*16) < 0.5 && Math.abs(player.ry - player.gy*16) < 0.5;
             
             if (atTarget && !dialogue) {
                 let nx = player.gx, ny = player.gy;
                 if (keys['w']) ny--; else if (keys['s']) ny++; else if (keys['a']) nx--; else if (keys['d']) nx++;
                 
+                // Check map bounds & walls
                 if (level.map[ny] && level.map[ny][nx] !== 1 && !(nx === level.npc.x && ny === level.npc.y)) {
-                    // Start moving to new tile
-                    player.gx = nx; player.gy = ny;
+                    player.gx = nx; 
+                    player.gy = ny;
 
-                    // IMMEDIATE WARP CHECK
+                    // CHECK FOR WARP ON THE NEW TILE
                     const w = level.warps.find(wp => wp.x === nx && wp.y === ny);
-                    if (w) { isWarping = true; warpData = w; return; }
+                    if (w) { 
+                        isWarping = true; 
+                        warpData = w; 
+                        return; 
+                    }
                 }
                 player.anim = 0;
             } else {
@@ -156,17 +163,20 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             uiCtx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
 
+            // 1. Map Tiles
             level.map.forEach((row, y) => row.forEach((tile, x) => {
                 const isDoor = level.warps.some(w => w.x === x && w.y === y);
                 ctx.fillStyle = tile === 1 ? '#1a252f' : (isDoor ? '#3498db' : '#27ae60');
                 ctx.fillRect(Math.round(x*16 - rx), Math.round(y*16 - ry), 16, 16);
             }));
 
+            // 2. Shadows & Entities
             const pY = player.ry - Math.abs(Math.sin(player.anim)) * 3;
             const nY = level.npc.y * 16 - Math.sin(Date.now()/600) * 0.5;
             const ents = [{x:player.rx, y:pY, c:player.color}, {x:level.npc.x*16, y:nY, c:level.npc.color}].sort((a,b)=>a.y-b.y);
             ents.forEach(e => { ctx.fillStyle = e.c; ctx.fillRect(Math.round(e.x-rx), Math.round(e.y-ry), 16, 16); });
 
+            // 3. Atmosphere
             const night = (Math.sin(time) + 1) / 2;
             uiCtx.fillStyle = `rgba(10, 10, 40, ${night * 0.45})`;
             uiCtx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
