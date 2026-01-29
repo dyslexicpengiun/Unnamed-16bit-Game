@@ -83,40 +83,58 @@
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
         function update() {
-            try {
-                if (isAutoTime) time += 0.005;
-                else time += ((manualNight === 1 ? Math.PI/2 : -Math.PI/2) - time) * 0.05;
-                if (shake > 0.1) shake *= 0.8; else shake = 0;
-                parts.forEach(p => { p.y -= p.v; if (p.y < -10) p.y = uiCanvas.height + 10; });
+    try {
+        if (isAutoTime) time += 0.005;
+        else time += ((manualNight === 1 ? Math.PI/2 : -Math.PI/2) - time) * 0.05;
+        if (shake > 0.1) shake *= 0.8; else shake = 0;
+        parts.forEach(p => { p.y -= p.v; if (p.y < -10) p.y = uiCanvas.height + 10; });
 
-                if (isWarping) {
-                    fade += 0.08; 
-                    if (fade >= 1) {
-                        currentKey = warpData.to; level = levels[currentKey];
-                        player.gx = warpData.tx; player.gy = warpData.ty;
-                        player.rx = player.gx * 16; player.ry = player.gy * 16;
-                        isWarping = false; dialogue = false;
-                    }
-                    return;
-                } else if (fade > 0) fade -= 0.08;
+        if (isWarping) {
+            fade += 0.08; 
+            if (fade >= 1) {
+                currentKey = warpData.to; 
+                level = levels[currentKey];
+                player.gx = warpData.tx; 
+                player.gy = warpData.ty;
+                player.rx = player.gx * 16; 
+                player.ry = player.gy * 16;
+                isWarping = false; 
+                dialogue = false; // Always close dialogue on warp
+            }
+            return;
+        } else if (fade > 0) fade -= 0.08;
 
-                const atTarget = Math.abs(player.rx - player.gx*16) < 0.5 && Math.abs(player.ry - player.gy*16) < 0.5;
-                if (atTarget && !dialogue) {
-                    let nx = player.gx, ny = player.gy;
-                    if (keys['w']) ny--; else if (keys['s']) ny++; else if (keys['a']) nx--; else if (keys['d']) nx++;
-                    if (level.map[ny] && level.map[ny][nx] !== 1 && !(nx === level.npc.x && ny === level.npc.y)) {
-                        if (!level.chests.some(c => c.x === nx && c.y === ny)) {
-                            player.gx = nx; player.gy = ny;
-                            const w = level.warps.find(wp => wp.x === nx && wp.y === ny);
-                            if (w) { isWarping = true; warpData = w; }
-                        }
+        const atTarget = Math.abs(player.rx - player.gx*16) < 0.5 && Math.abs(player.ry - player.gy*16) < 0.5;
+        
+        // --- FIXED: Warp check now runs regardless of dialogue ---
+        if (atTarget) {
+            const w = level.warps.find(wp => wp.x === player.gx && wp.y === player.gy);
+            if (w) { 
+                isWarping = true; 
+                warpData = w; 
+                return; 
+            }
+
+            if (!dialogue) {
+                let nx = player.gx, ny = player.gy;
+                if (keys['w']) ny--; else if (keys['s']) ny++; else if (keys['a']) nx--; else if (keys['d']) nx++;
+                
+                // Permission check
+                if (level.map[ny] && level.map[ny][nx] !== 1 && !(nx === level.npc.x && ny === level.npc.y)) {
+                    if (!level.chests.some(c => c.x === nx && c.y === ny)) {
+                        player.gx = nx; player.gy = ny;
                     }
-                    player.anim = 0;
-                } else { player.anim += 0.25; }
-                player.rx += (player.gx * 16 - player.rx) * player.s;
-                player.ry += (player.gy * 16 - player.ry) * player.s;
-            } catch (e) { console.error("Update loop error:", e); }
+                }
+            }
+            player.anim = 0;
+        } else { 
+            player.anim += 0.25; 
         }
+
+        player.rx += (player.gx * 16 - player.rx) * player.s;
+        player.ry += (player.gy * 16 - player.ry) * player.s;
+    } catch (e) { console.error("Update loop error:", e); }
+}
 
         function draw() {
             update();
