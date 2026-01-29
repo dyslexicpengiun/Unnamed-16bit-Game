@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JS RPG - Sprite Edition</title>
+    <style>
+        body, html { margin: 0; padding: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { position: absolute; }
+        #gameCanvas { image-rendering: pixelated; z-index: 1; }
+        #uiCanvas { z-index: 2; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <canvas id="uiCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const uiCanvas = document.getElementById('uiCanvas');
+        const uiCtx = uiCanvas.getContext('2d');
+
+        // --- SPRITE LOADING ---
+        const spriteSheet = new Image();
+        spriteSheet.crossOrigin = "anonymous"; // Helps with loading from external URLs
+        spriteSheet.src = 'https://i.imgur.com'; // Generic 16x16 RPG sheet
+        let spritesLoaded = false;
+        spriteSheet.onload = () => { spritesLoaded = true; };
+
+        const ASPECT_RATIO = 16 / 9;
+        const scale = 3.5; 
+        const tileSize = 16;
+        const keys = {};
+        
+        let timeOfDay = 0; 
+        let shake = 0;    
+        const particles = [];
+
+        const player = { 
+            type: 'player', gridX: 4, gridY: 4, realX: 4*16, realY: 4*16, 
+            speed: 0.15, walkTimer: 0, 
+            spriteCol: 0, spriteRow: 0 // Position on the sprite sheet
+        };
+
+        const npc = { 
+            type: 'npc', gridX: 8, gridY: 6, realX: 8*16, realY: 6*16,
+            breathTimer: 0, 
+            spriteCol: 1, spriteRow: 0,
+            message: "I am but a sprite now. Technology is wondrous!" 
+        };
+
+        const worldMap = [,,,,,,,,,];
+        let showDialogue = false;
+
+        function initParticles() {
+            particles.length = 0;
+            for(let i=0; i<40; i++) {
+                particles.push({ x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight, s: 0.2 + Math.random() * 0.5, o: Math.random() * Math.PI * 2 });
+            }
+        }
+
+        function resize() {
+            let w = window.innerWidth, h = window.innerHeight;
+            if (w / h > ASPECT_RATIO) w = h * ASPECT_RATIO; else h = w / ASPECT_RATIO;
+            canvas.width = w / scale; canvas.height = h / scale;
+            uiCanvas.width = w; uiCanvas.height = h;
+            ctx.imageSmoothingEnabled = false;
+            [canvas, uiCanvas].forEach(c => { c.style.width = `${w}px`; c.style.height = `${h}px`; });
+            initParticles();
+        }
+
+        const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+
+        window.addEventListener('resize', resize);
+        window.addEventListener('keydown', e => {
+            const k = e.key.toLowerCase();
+            keys[k] = true;
+            if (k === 'e') {
+                const dist = Math.abs(player.gridX - npc.gridX) + Math.abs(player.gridY - npc.gridY);
+                if (dist === 1) { showDialogue = !showDialogue; if (showDialogue) shake = 4; }
+            }
+        });
+        window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+        function update() {
+            npc.breathTimer += 0.05;
+            timeOfDay += 0.005;
+            if (shake > 0.01) shake *= 0.9; else shake = 0;
+
+            particles.forEach(p => {
+                p.y -= p.s; p.x += Math.sin(p.o + timeOfDay) * 0.2;
+                if (p.y < -20) p.y = uiCanvas.height + 20;
+                if (p.x < -20) p.x = uiCanvas.width + 20;
+                if (p.x > uiCanvas.width + 20) p.x = -20;
+            });
+
+            const isAtTarget = Math.abs(player.realX - player.gridX * tileSize) < 0.1 && 
+                               Math.abs(player.realY - player.gridY * tileSize) < 0.1;
+
+            if (isAtTarget && !showDialogue) {
+                let nX = player.gridX, nY = player.gridY;
+                if (keys['w']) nY--; else if (keys['s']) nY++; else if (keys['a']) nX--; else if (keys['d']) nX++;
+                if (worldMap[nY] && worldMap[nY][nX] === 0 && !(nX === npc.gridX && nY === npc.gridY)) {
+                    player.gridX = nX; player.gridY = nY;
+                }
+                player.walkTimer = 0;
+            } else if (!isAtTarget) {
+                player.walkTimer += 0.25;
+            }
+            player.realX += (player.gridX * tileSize - player.realX) * player.speed;
+            player.realY += (player.gridY * tileSize - player.realY) * player.speed;
+        }
+
+        function draw() {
+            update();
+            const mapW = worldMap.length * tileSize, mapH = worldMap.length * tileSize;
+            let camX = clamp(player.realX - canvas.width/2 + 8, 0, mapW - canvas.width);
+            let camY = clamp(player.realY - canvas.height/2 + 8, 0, mapH - canvas.height);
+            if (shake > 0) { camX += (Math.random() - 0.5) * shake; camY += (Math.random() - 0.5) * shake; }
+            const rX = Math.round(camX), rY = Math.round(camY);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            uiCtx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
+
+            // 1. Map
+            for (let y = 0; y < worldMap.length; y++) {
+                for (let x = 0; x < worldMap[y].length; x++) {
+                    ctx.fillStyle = worldMap[y][x] === 1 ? '#1a252f' : '#27ae60';
+                    ctx.fillRect(Math.round(x*tileSize - rX), Math.round(y*tileSize - rY), tileSize, tileSize);
+                }
+            }
+
+            // 2. Shadows
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            [player, npc].forEach(ent => {
+                ctx.beginPath();
+                ctx.ellipse(Math.round(ent.realX - rX + 8), Math.round(ent.realY - rY + 15), 6, 2, 0, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 3. Characters (Sprites)
+            if (spritesLoaded) {
+                const renderList = [player, npc].sort((a, b) => a.realY - b.realY);
+                renderList.forEach(ent => {
+                    const off = (ent.type === 'npc') ? Math.sin(npc.breathTimer) * 0.5 : Math.abs(Math.sin(player.walkTimer)) * 3;
+                    
+                    ctx.drawImage(
+                        spriteSheet,
+                        ent.spriteCol * tileSize, ent.spriteRow * tileSize, tileSize, tileSize, // Source crop
+                        Math.round(ent.realX - rX), Math.round(ent.realY - rY - off), tileSize, tileSize // Destination
+                    );
+                });
+            }
+
+            // 4. Atmosphere
+            const nightVal = (Math.sin(timeOfDay) + 1) / 2;
+            uiCtx.fillStyle = `rgba(10, 10, 40, ${nightVal * 0.5})`;
+            uiCtx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
+
+            particles.forEach(p => {
+                uiCtx.fillStyle = `rgba(255, ${220 + (1-nightVal)*35}, ${180 + (1-nightVal)*75}, ${0.4 + Math.sin(timeOfDay + p.o)*0.2})`;
+                uiCtx.beginPath(); uiCtx.arc(p.x, p.y, 1.8, 0, Math.PI * 2); uiCtx.fill();
+            });
+            
+            const v = uiCtx.createRadialGradient(uiCanvas.width/2, uiCanvas.height/2, uiCanvas.width/4, uiCanvas.width/2, uiCanvas.height/2, uiCanvas.width/1.1);
+            v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, `rgba(0,0,0,${0.3 + nightVal * 0.4})`);
+            uiCtx.fillStyle = v; uiCtx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
+
+            // 5. Dialogue
+            if (showDialogue) {
+                const m = 60, h = 120;
+                uiCtx.fillStyle = 'rgba(15, 20, 30, 0.95)';
+                uiCtx.strokeStyle = '#d4af37';
+                uiCtx.lineWidth = 3;
+                uiCtx.strokeRect(m, uiCanvas.height - h - m, uiCanvas.width - (m*2), h);
+                uiCtx.fillRect(m, uiCanvas.height - h - m, uiCanvas.width - (m*2), h);
+                uiCtx.fillStyle = '#eee';
+                uiCtx.font = 'italic 22px serif';
+                uiCtx.fillText(npc.message, m + 40, uiCanvas.height - h - m + 65);
+            }
+            requestAnimationFrame(draw);
+        }
+
+        resize();
+        draw();
+    </script>
+</body>
+</html>
