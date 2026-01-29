@@ -15,164 +15,180 @@
     <canvas id="uiCanvas"></canvas>
 
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const uiCanvas = document.getElementById('uiCanvas');
-        const uiCtx = uiCanvas.getContext('2d');
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const uiCanvas = document.getElementById('uiCanvas');
+    const uiCtx = uiCanvas.getContext('2d');
 
-        const ASPECT_RATIO = 16 / 9;
-        const scale = 3.5; 
-        const tileSize = 16;
-        const keys = {};
+    const ASPECT_RATIO = 16 / 9;
+    const scale = 3.5; 
+    const tileSize = 16;
+    const keys = {};
 
-        // --- LEVELS (Guaranteed Data) ---
-        const levels = {
-            town: {
-                map: [
-                    [1,1,1,1,1,1,1,1,1,1],
-                    [1,0,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,0,1],
-                    [1,1,1,1,0,1,1,1,1,1], // Door at x4, y4
-                    [1,0,0,0,0,0,0,0,0,1],
-                    [1,1,1,1,1,1,1,1,1,1]
-                ],
-                npc: { x: 7, y: 2, color: '#3498db', msg: "Welcome to Town! Enter the blue door." },
-                warps: [{ x: 4, y: 4, to: 'house', tx: 4, ty: 3 }]
-            },
-            house: {
-                map: [
-                    [1,1,1,1,1,1,1,1,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,1,1,1,0,1,1,1,1], // Exit at x4, y3
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,1,1,1,1,1,1,1,1]
-                ],
-                npc: { x: 2, y: 1, color: '#9b59b6', msg: "Cozy home! Step on the blue rug to leave." },
-                warps: [{ x: 4, y: 3, to: 'town', tx: 4, ty: 5 }]
-            }
-        };
+    const levels = {
+        town: {
+            map: [
+                [1,1,1,1,1,1,1,1,1,1],
+                [1,0,0,0,0,0,0,0,0,1],
+                [1,0,0,0,0,0,0,0,0,1],
+                [1,0,0,0,0,0,0,0,0,1],
+                [1,1,1,1,0,1,1,1,1,1], 
+                [1,0,0,0,0,0,0,0,0,1],
+                [1,1,1,1,1,1,1,1,1,1]
+            ],
+            npc: { x: 7, y: 2, color: '#3498db', msg: "Press 'N' to toggle Night Mode manually!" },
+            warps: [{ x: 4, y: 4, to: 'house', tx: 4, ty: 3 }]
+        },
+        house: {
+            map: [
+                [1,1,1,1,1,1,1,1,1,1],
+                [1,0,0,0,0,0,0,0,0,1],
+                [1,0,0,0,0,0,0,0,0,1],
+                [1,1,1,1,0,1,1,1,1,1], 
+                [1,0,0,0,0,0,0,0,0,1],
+                [1,1,1,1,1,1,1,1,1,1]
+            ],
+            npc: { x: 2, y: 1, color: '#9b59b6', msg: "The embers look better at night, right?" },
+            warps: [{ x: 4, y: 3, to: 'town', tx: 4, ty: 5 }]
+        }
+    };
 
-        let currentKey = 'town';
-        let level = levels[currentKey];
-        let fade = 0, isWarping = false, warpData = null;
-        let time = 0, shake = 0, parts = [];
-        let dialogue = false;
+    let currentKey = 'town';
+    let level = levels[currentKey];
+    let fade = 0, isWarping = false, warpData = null;
+    let time = 0, shake = 0, parts = [];
+    let dialogue = false;
 
-        const player = { gx: 2, gy: 2, rx: 32, ry: 32, s: 0.15, anim: 0, color: '#e74c3c' };
+    // --- NEW TIME CONTROL ---
+    let isAutoTime = true;
+    let manualNight = 0; // 0 is day, 1 is night
 
-        function initParts() {
-            parts = Array.from({length: 30}, () => ({
-                x: Math.random() * window.innerWidth,
-                y: Math.random() * window.innerHeight,
-                v: 0.2 + Math.random() * 0.5
-            }));
+    const player = { gx: 2, gy: 2, rx: 32, ry: 32, s: 0.15, anim: 0, color: '#e74c3c' };
+
+    function initParts() {
+        parts = Array.from({length: 30}, () => ({
+            x: Math.random() * window.innerWidth,
+            y: Math.random() * window.innerHeight,
+            v: 0.2 + Math.random() * 0.5
+        }));
+    }
+
+    function resize() {
+        let w = window.innerWidth, h = window.innerHeight;
+        if (w/h > ASPECT_RATIO) w = h * ASPECT_RATIO; else h = w / ASPECT_RATIO;
+        canvas.width = w/scale; canvas.height = h/scale;
+        uiCanvas.width = w; uiCanvas.height = h;
+        ctx.imageSmoothingEnabled = false;
+        [canvas, uiCanvas].forEach(c => { c.style.width = `${w}px`; c.style.height = `${h}px`; });
+        initParts();
+    }
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('keydown', e => {
+        const k = e.key.toLowerCase();
+        keys[k] = true;
+        
+        // Toggle Day/Night
+        if (k === 'n') {
+            isAutoTime = false;
+            manualNight = manualNight === 0 ? 1 : 0;
         }
 
-        function resize() {
-            let w = window.innerWidth, h = window.innerHeight;
-            if (w/h > ASPECT_RATIO) w = h * ASPECT_RATIO; else h = w / ASPECT_RATIO;
-            canvas.width = w/scale; canvas.height = h/scale;
-            uiCanvas.width = w; uiCanvas.height = h;
-            ctx.imageSmoothingEnabled = false;
-            [canvas, uiCanvas].forEach(c => { c.style.width = `${w}px`; c.style.height = `${h}px`; });
-            initParts();
+        if (k === 'e' && !isWarping) {
+            const d = Math.abs(player.gx - level.npc.x) + Math.abs(player.gy - level.npc.y);
+            if (d === 1) { dialogue = !dialogue; if(dialogue) shake = 4; }
         }
+    });
+    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-        window.addEventListener('resize', resize);
-        window.addEventListener('keydown', e => {
-            keys[e.key.toLowerCase()] = true;
-            if (e.key === 'e' && !isWarping) {
-                const d = Math.abs(player.gx - level.npc.x) + Math.abs(player.gy - level.npc.y);
-                if (d === 1) { dialogue = !dialogue; if(dialogue) shake = 4; }
-            }
-        });
-        window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-
-        function update() {
+    function update() {
+        if (isAutoTime) {
             time += 0.005;
-            if (shake > 0.1) shake *= 0.8; else shake = 0;
-
-            // Particle drift
-            parts.forEach(p => {
-                p.y -= p.v;
-                if (p.y < -10) p.y = uiCanvas.height + 10;
-            });
-
-            if (isWarping) {
-                fade += 0.05;
-                if (fade >= 1) {
-                    currentKey = warpData.to;
-                    level = levels[currentKey];
-                    player.gx = warpData.tx; player.gy = warpData.ty;
-                    player.rx = player.gx * 16; player.ry = player.gy * 16;
-                    isWarping = false; dialogue = false;
-                }
-                return;
-            } else if (fade > 0) fade -= 0.05;
-
-            const atT = Math.abs(player.rx - player.gx*16) < 0.1 && Math.abs(player.ry - player.gy*16) < 0.1;
-            if (atT && !dialogue) {
-                let nx = player.gx, ny = player.gy;
-                if (keys['w']) ny--; else if (keys['s']) ny++; else if (keys['a']) nx--; else if (keys['d']) nx++;
-                
-                if (level.map[ny] && level.map[ny][nx] === 0 && !(nx === level.npc.x && ny === level.npc.y)) {
-                    player.gx = nx; player.gy = ny;
-                    const w = level.warps.find(wp => wp.x === nx && wp.y === ny);
-                    if (w) { isWarping = true; warpData = w; }
-                }
-                player.anim = 0;
-            } else if (!atT) player.anim += 0.2;
-
-            player.rx += (player.gx * 16 - player.rx) * player.s;
-            player.ry += (player.gy * 16 - player.ry) * player.s;
+        } else {
+            // Smoothly move towards manual target (day or night)
+            let target = manualNight === 1 ? Math.PI/2 : -Math.PI/2;
+            time += (target - time) * 0.1;
         }
 
-        function draw() {
-            update();
-            const mW = level.map[0].length * 16, mH = level.map.length * 16;
-            let cx = Math.max(0, Math.min(player.rx - canvas.width/2 + 8, mW - canvas.width));
-            let cy = Math.max(0, Math.min(player.ry - canvas.height/2 + 8, mH - canvas.height));
-            if (shake > 0) { cx += (Math.random()-0.5)*shake; cy += (Math.random()-0.5)*shake; }
-            const rx = Math.round(cx), ry = Math.round(cy);
+        if (shake > 0.1) shake *= 0.8; else shake = 0;
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            uiCtx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
+        parts.forEach(p => {
+            p.y -= p.v;
+            if (p.y < -10) p.y = uiCanvas.height + 10;
+        });
 
-            // Draw Tiles
-            level.map.forEach((row, y) => row.forEach((tile, x) => {
-                const isDoor = level.warps.some(w => w.x === x && w.y === y);
-                ctx.fillStyle = tile === 1 ? '#1a252f' : (isDoor ? '#3498db' : '#27ae60');
-                ctx.fillRect(Math.round(x*16 - rx), Math.round(y*16 - ry), 16, 16);
-            }));
-
-            // Entities
-            const pY = player.ry - Math.abs(Math.sin(player.anim)) * 3;
-            const nY = level.npc.y * 16 - Math.sin(Date.now()/600) * 0.5;
-            const ents = [{x:player.rx, y:pY, c:player.color}, {x:level.npc.x*16, y:nY, c:level.npc.color}].sort((a,b)=>a.y-b.y);
-            ents.forEach(e => { ctx.fillStyle = e.c; ctx.fillRect(Math.round(e.x-rx), Math.round(e.y-ry), 16, 16); });
-
-            // Atmosphere
-            const night = (Math.sin(time) + 1) / 2;
-            uiCtx.fillStyle = `rgba(10, 10, 40, ${night * 0.4})`;
-            uiCtx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
-            parts.forEach(p => {
-                uiCtx.fillStyle = `rgba(255, 200, 150, 0.6)`;
-                uiCtx.beginPath(); uiCtx.arc(p.x, p.y, 2, 0, 7); uiCtx.fill();
-            });
-
-            if (dialogue) {
-                uiCtx.fillStyle = 'rgba(15,20,30,0.9)'; uiCtx.strokeStyle='#d4af37'; uiCtx.lineWidth=3;
-                uiCtx.strokeRect(60, uiCanvas.height-160, uiCanvas.width-120, 100);
-                uiCtx.fillRect(60, uiCanvas.height-160, uiCanvas.width-120, 100);
-                uiCtx.fillStyle='#eee'; uiCtx.font='italic 22px serif';
-                uiCtx.fillText(level.npc.msg, 100, uiCanvas.height-100);
+        if (isWarping) {
+            fade += 0.05;
+            if (fade >= 1) {
+                currentKey = warpData.to;
+                level = levels[currentKey];
+                player.gx = warpData.tx; player.gy = warpData.ty;
+                player.rx = player.gx * 16; player.ry = player.gy * 16;
+                isWarping = false; dialogue = false;
             }
-            if (fade > 0) { uiCtx.fillStyle = `rgba(0,0,0,${fade})`; uiCtx.fillRect(0,0,uiCanvas.width,uiCanvas.height); }
-            requestAnimationFrame(draw);
+            return;
+        } else if (fade > 0) fade -= 0.05;
+
+        const atT = Math.abs(player.rx - player.gx*16) < 0.1 && Math.abs(player.ry - player.gy*16) < 0.1;
+        if (atT && !dialogue) {
+            let nx = player.gx, ny = player.gy;
+            if (keys['w']) ny--; else if (keys['s']) ny++; else if (keys['a']) nx--; else if (keys['d']) nx++;
+            
+            if (level.map[ny] && level.map[ny][nx] === 0 && !(nx === level.npc.x && ny === level.npc.y)) {
+                player.gx = nx; player.gy = ny;
+                const w = level.warps.find(wp => wp.x === nx && wp.y === ny);
+                if (w) { isWarping = true; warpData = w; }
+            }
+            player.anim = 0;
+        } else if (!atT) player.anim += 0.2;
+
+        player.rx += (player.gx * 16 - player.rx) * player.s;
+        player.ry += (player.gy * 16 - player.ry) * player.s;
+    }
+
+    function draw() {
+        update();
+        const mW = level.map[0].length * 16, mH = level.map.length * 16;
+        let cx = Math.max(0, Math.min(player.rx - canvas.width/2 + 8, mW - canvas.width));
+        let cy = Math.max(0, Math.min(player.ry - canvas.height/2 + 8, mH - canvas.height));
+        if (shake > 0) { cx += (Math.random()-0.5)*shake; cy += (Math.random()-0.5)*shake; }
+        const rx = Math.round(cx), ry = Math.round(cy);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        uiCtx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
+
+        level.map.forEach((row, y) => row.forEach((tile, x) => {
+            const isDoor = level.warps.some(w => w.x === x && w.y === y);
+            ctx.fillStyle = tile === 1 ? '#1a252f' : (isDoor ? '#3498db' : '#27ae60');
+            ctx.fillRect(Math.round(x*16 - rx), Math.round(y*16 - ry), 16, 16);
+        }));
+
+        const pY = player.ry - Math.abs(Math.sin(player.anim)) * 3;
+        const nY = level.npc.y * 16 - Math.sin(Date.now()/600) * 0.5;
+        const ents = [{x:player.rx, y:pY, c:player.color}, {x:level.npc.x*16, y:nY, c:level.npc.color}].sort((a,b)=>a.y-b.y);
+        ents.forEach(e => { ctx.fillStyle = e.c; ctx.fillRect(Math.round(e.x-rx), Math.round(e.y-ry), 16, 16); });
+
+        const night = (Math.sin(time) + 1) / 2;
+        uiCtx.fillStyle = `rgba(10, 10, 40, ${night * 0.45})`;
+        uiCtx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
+        
+        parts.forEach(p => {
+            uiCtx.fillStyle = `rgba(255, 200, 150, ${0.3 + night * 0.4})`;
+            uiCtx.beginPath(); uiCtx.arc(p.x, p.y, 2, 0, 7); uiCtx.fill();
+        });
+
+        if (dialogue) {
+            uiCtx.fillStyle = 'rgba(15,20,30,0.9)'; uiCtx.strokeStyle='#d4af37'; uiCtx.lineWidth=3;
+            uiCtx.strokeRect(60, uiCanvas.height-160, uiCanvas.width-120, 100);
+            uiCtx.fillRect(60, uiCanvas.height-160, uiCanvas.width-120, 100);
+            uiCtx.fillStyle='#eee'; uiCtx.font='italic 22px serif';
+            uiCtx.fillText(level.npc.msg, 100, uiCanvas.height-100);
         }
-        resize(); draw();
-    </script>
+        if (fade > 0) { uiCtx.fillStyle = `rgba(0,0,0,${fade})`; uiCtx.fillRect(0,0,uiCanvas.width,uiCanvas.height); }
+        requestAnimationFrame(draw);
+    }
+    resize(); draw();
+</script>
+
 </body>
 </html>
