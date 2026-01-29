@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>JS RPG - Pixel Rain Transition</title>
+    <title>JS RPG - Pixel Rain Drip</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { position: absolute; }
@@ -28,14 +28,26 @@
         // --- LEVELS ---
         const levels = {
             town: {
-                map: [[1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,1,1,1,0,1,1,1,1],[1,0,0,0,0,0,0,0,1]],
-                npc: { x: 7, y: 2, color: '#3498db', msg: "Press 'B' for the Pixel Dissolve transition!" },
+                map: [
+                  ,
+                  ,
+                  ,
+                  ,
+                  ,
+                ],
+                npc: { x: 7, y: 2, color: '#3498db', msg: "Press 'B' for the Pixel Drip transition!" },
                 warps: [{ x: 4, y: 4, to: 'house', tx: 4, ty: 4 }],
                 chests: []
             },
             house: {
-                map: [[1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,1,1,1,0,1,1,1,1],[1,0,0,0,0,0,0,0,1]],
-                npc: { x: 2, y: 1, color: '#9b59b6', msg: "Stay as long as you like." },
+                map: [
+                  ,
+                  ,
+                  ,
+                  ,
+                  ,
+                ],
+                npc: { x: 2, y: 1, color: '#9b59b6', msg: "Cozy." },
                 warps: [{ x: 4, y: 5, to: 'town', tx: 4, ty: 5 }],
                 chests: [{ x: 6, y: 2, opened: false, item: "Rusty Sword", color: "#d35400" }]
             }
@@ -50,21 +62,20 @@
         let dialogue = false, diagMsg = "";
         let isAutoTime = true, manualNight = 0;
 
-        // --- PIXEL RAIN / DISSOLVE SYSTEM ---
-        let transitionBlocks = [];
-        const BLOCK_SIZE = 24; // Size of the dissolving pixels
+        // --- PIXEL DRIP SYSTEM ---
+        let dripColumns = [];
+        const DRIP_WIDTH = 12; // Width of each "rain" column
 
-        function initTransition() {
-            transitionBlocks = [];
-            const cols = Math.ceil(uiCanvas.width / BLOCK_SIZE);
-            const rows = Math.ceil(uiCanvas.height / BLOCK_SIZE);
-            for (let y = 0; y < rows; y++) {
-                for (let x = 0; x < cols; x++) {
-                    transitionBlocks.push({ x: x * BLOCK_SIZE, y: y * BLOCK_SIZE, filled: false });
-                }
+        function initDrip() {
+            dripColumns = [];
+            const cols = Math.ceil(uiCanvas.width / DRIP_WIDTH);
+            for (let i = 0; i < cols; i++) {
+                dripColumns.push({
+                    x: i * DRIP_WIDTH,
+                    y: -Math.random() * 200, // Staggered start heights
+                    speed: 5 + Math.random() * 8
+                });
             }
-            // Shuffle blocks for a random dissolve feel
-            transitionBlocks.sort(() => Math.random() - 0.5);
         }
 
         function resize() {
@@ -84,7 +95,7 @@
             if (k === 'n') { isAutoTime = !isAutoTime; if(!isAutoTime) manualNight = (Math.sin(time) > 0) ? 0 : 1; }
             if (k === 'b' && gameState === 'EXPLORE') {
                 gameState = 'TRANSITION';
-                initTransition();
+                initDrip();
                 dialogue = false;
             }
             if (k === 'e' && !isWarping && gameState === 'EXPLORE') {
@@ -104,16 +115,12 @@
 
         function update() {
             if (gameState === 'TRANSITION') {
-                // Fill 25 blocks per frame
-                let filledThisFrame = 0;
-                for (let b of transitionBlocks) {
-                    if (!b.filled) {
-                        b.filled = true;
-                        filledThisFrame++;
-                        if (filledThisFrame > 25) break;
-                    }
-                }
-                if (transitionBlocks.every(b => b.filled)) gameState = 'BATTLE';
+                let finished = true;
+                dripColumns.forEach(c => {
+                    c.y += c.speed;
+                    if (c.y < uiCanvas.height) finished = false;
+                });
+                if (finished) gameState = 'BATTLE';
                 return;
             }
 
@@ -156,14 +163,8 @@
         function draw() {
             update();
             
-            if (gameState === 'BATTLE') {
-                ctx.fillStyle = '#002'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                uiCtx.fillStyle = 'white'; uiCtx.font = '30px serif';
-                uiCtx.fillText("BATTLE: Slime Appears!", 100, 100);
-                return;
-            }
-
-            const mW = level.map[0].length * 16, mH = level.map.length * 16;
+            // We ALWAYS draw the "Current Environment" to the main canvas
+            const mW = level.map.length * 16, mH = level.map.length * 16;
             let cx = Math.max(0, Math.min(player.rx - canvas.width/2 + 8, mW - canvas.width));
             let cy = Math.max(0, Math.min(player.ry - canvas.height/2 + 8, mH - canvas.height));
             if (shake > 0) { cx += (Math.random()-0.5)*shake; cy += (Math.random()-0.5)*shake; }
@@ -172,36 +173,48 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             uiCtx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
 
-            // Draw World
-            level.map.forEach((row, y) => row.forEach((tile, x) => {
-                const isDoor = level.warps.some(w => w.x === x && w.y === y);
-                ctx.fillStyle = tile === 1 ? '#1a252f' : (isDoor ? '#3498db' : '#27ae60');
-                ctx.fillRect(Math.round(x*16 - rx), Math.round(y*16 - ry), 16, 16);
-            }));
+            if (gameState !== 'BATTLE') {
+                level.map.forEach((row, y) => row.forEach((tile, x) => {
+                    const isDoor = level.warps.some(w => w.x === x && w.y === y);
+                    ctx.fillStyle = tile === 1 ? '#1a252f' : (isDoor ? '#3498db' : '#27ae60');
+                    ctx.fillRect(Math.round(x*16 - rx), Math.round(y*16 - ry), 16, 16);
+                }));
 
-            // Entities
-            const pY = player.ry - Math.abs(Math.sin(Date.now()/200)) * 2;
-            const ents = [{x:player.rx, y:pY, c:player.color}, {x:level.npc.x*16, y:level.npc.y*16, c:level.npc.color}];
-            level.chests.forEach(c => ents.push({x: c.x*16, y: c.y*16, c: c.color}));
-            ents.forEach(e => { ctx.fillStyle = e.c; ctx.fillRect(Math.round(e.x-rx), Math.round(e.y-ry), 16, 16); });
+                const pY = player.ry - Math.abs(Math.sin(Date.now()/200)) * 2;
+                const ents = [{x:player.rx, y:pY, c:player.color}, {x:level.npc.x*16, y:level.npc.y*16, c:level.npc.color}];
+                level.chests.forEach(c => ents.push({x: c.x*16, y: c.y*16, c: c.color}));
+                ents.forEach(e => { ctx.fillStyle = e.c; ctx.fillRect(Math.round(e.x-rx), Math.round(e.y-ry), 16, 16); });
 
-            // Post-Processing
-            const night = (Math.sin(time) + 1) / 2;
-            uiCtx.fillStyle = `rgba(10, 10, 40, ${night * 0.4})`;
-            uiCtx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
-            parts.forEach(p => { uiCtx.fillStyle = `rgba(255, 200, 150, 0.6)`; uiCtx.beginPath(); uiCtx.arc(p.x, p.y, 2, 0, 7); uiCtx.fill(); });
-
-            if (dialogue) {
-                uiCtx.fillStyle = 'rgba(15,20,30,0.9)'; uiCtx.fillRect(60, uiCanvas.height-160, uiCanvas.width-120, 100);
-                uiCtx.fillStyle='#eee'; uiCtx.font='italic 22px serif'; uiCtx.fillText(diagMsg, 100, uiCanvas.height-100);
+                const night = (Math.sin(time) + 1) / 2;
+                uiCtx.fillStyle = `rgba(10, 10, 40, ${night * 0.4})`;
+                uiCtx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
+                parts.forEach(p => { uiCtx.fillStyle = `rgba(255, 200, 150, 0.6)`; uiCtx.beginPath(); uiCtx.arc(p.x, p.y, 2, 0, 7); uiCtx.fill(); });
+            } else {
+                // Persistent Battle Scene
+                ctx.fillStyle = '#002'; 
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                uiCtx.fillStyle = 'white'; 
+                uiCtx.font = '30px serif';
+                uiCtx.fillText("BATTLE ARENA", 100, 100);
             }
 
-            // --- THE PIXEL DISSOLVE DRAW ---
+            // --- THE PIXEL DRIP REVEAL ---
             if (gameState === 'TRANSITION') {
-                uiCtx.fillStyle = 'black';
-                for (let b of transitionBlocks) {
-                    if (b.filled) uiCtx.fillRect(b.x, b.y, BLOCK_SIZE, BLOCK_SIZE);
-                }
+                // Draw the NEW environment (blue battle arena) over the old one using drip columns
+                dripColumns.forEach(col => {
+                    uiCtx.fillStyle = '#002'; // The color of the upcoming battle arena
+                    // Draw a rectangle from the top of the screen down to the drip's current Y
+                    uiCtx.fillRect(col.x, 0, DRIP_WIDTH, col.y);
+                    
+                    // Optional: Draw a "leading edge" light strip for that digital feel
+                    uiCtx.fillStyle = '#4834d4';
+                    uiCtx.fillRect(col.x, col.y - 4, DRIP_WIDTH, 4);
+                });
+            }
+
+            if (dialogue && gameState === 'EXPLORE') {
+                uiCtx.fillStyle = 'rgba(15,20,30,0.9)'; uiCtx.fillRect(60, uiCanvas.height-160, uiCanvas.width-120, 100);
+                uiCtx.fillStyle='#eee'; uiCtx.font='italic 22px serif'; uiCtx.fillText(diagMsg, 100, uiCanvas.height-100);
             }
 
             if (fade > 0) { uiCtx.fillStyle = `rgba(0,0,0,${fade})`; uiCtx.fillRect(0,0,uiCanvas.width,uiCanvas.height); }
