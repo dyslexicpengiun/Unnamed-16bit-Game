@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>JS RPG - Crash-Proof Build</title>
+    <title>JS RPG - Loot & Movement Fix</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { position: absolute; }
@@ -25,23 +25,35 @@
         const tileSize = 16;
         const keys = {};
 
-        // --- LEVEL DEFINITIONS ---
         const levels = {
             town: {
-                map: [[1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,1,1,1,0,1,1,1,1],[1,0,0,0,0,0,0,0,1],[1,1,1,1,1,1,1,1,1]],
-                npc: { x: 7, y: 2, color: '#3498db', msg: "Walk into the blue door to enter!" },
+                map: [
+                   [1,1,1,1,1,1,1,1,1],
+                   [1,0,0,0,0,0,0,0,1],
+                   [1,0,0,0,0,0,0,0,1],
+                   [1,0,0,0,0,0,0,0,1],
+                   [1,1,1,1,0,1,1,1,1],
+                   [1,0,0,0,0,0,0,0,1]
+                ],
+                npc: { x: 7, y: 2, color: '#3498db', msg: "Check the house for supplies!" },
                 warps: [{ x: 4, y: 4, to: 'house', tx: 4, ty: 4 }],
                 chests: []
             },
             house: {
-                map: [[1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,1,1,1,0,1,1,1,1]],
-                npc: { x: 2, y: 1, color: '#9b59b6', msg: "Step on the blue rug to leave." },
+                map: [
+                   [1,1,1,1,1,1,1,1,1],
+                   [1,0,0,0,0,0,0,0,1],
+                   [1,0,0,0,0,0,0,0,1],
+                   [1,0,0,0,0,0,0,0,1],
+                   [1,0,0,0,0,0,0,0,1],
+                   [1,1,1,1,0,1,1,1,1]
+                ],
+                npc: { x: 2, y: 2, color: '#9b59b6', msg: "Did you find my sword?" },
                 warps: [{ x: 4, y: 5, to: 'town', tx: 4, ty: 5 }],
                 chests: [{ x: 6, y: 2, opened: false, item: "Rusty Sword", color: "#d35400" }]
             }
         };
 
-        // --- CORE STATE ---
         let currentKey = 'town';
         let level = levels[currentKey];
         let fade = 0, isWarping = false, warpData = null;
@@ -69,13 +81,34 @@
         window.addEventListener('keydown', e => {
             const k = e.key.toLowerCase();
             keys[k] = true;
+            
             if (k === 'n') { isAutoTime = !isAutoTime; if(!isAutoTime) manualNight = (Math.sin(time) > 0) ? 0 : 1; }
+            
             if (k === 'e' && !isWarping) {
-                const d = Math.abs(player.gx - level.npc.x) + Math.abs(player.gy - level.npc.y);
-                if (d === 1) { diagMsg = level.npc.msg; dialogue = !dialogue; if(dialogue) shake = 3; return; }
+                // UNIVERSAL TOGGLE: If dialogue is open, close it and stop.
+                if (dialogue) {
+                    dialogue = false;
+                    return;
+                }
+
+                // Check NPC
+                const dNPC = Math.abs(player.gx - level.npc.x) + Math.abs(player.gy - level.npc.y);
+                if (dNPC === 1) { 
+                    diagMsg = level.npc.msg; 
+                    dialogue = true; 
+                    shake = 3; 
+                    return;
+                }
+
+                // Check Chests
                 level.chests.forEach(c => {
-                    if (Math.abs(player.gx - c.x) + Math.abs(player.gy - c.y) === 1 && !c.opened) {
-                        c.opened = true; c.color = "#7f8c8d"; diagMsg = "Found: " + c.item + "!"; dialogue = true; shake = 8;
+                    const dC = Math.abs(player.gx - c.x) + Math.abs(player.gy - c.y);
+                    if (dC === 1 && !c.opened) {
+                        c.opened = true;
+                        c.color = "#7f8c8d";
+                        diagMsg = "Found: " + c.item + "!";
+                        dialogue = true;
+                        shake = 8;
                     }
                 });
             }
@@ -83,58 +116,41 @@
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
         function update() {
-    try {
-        if (isAutoTime) time += 0.005;
-        else time += ((manualNight === 1 ? Math.PI/2 : -Math.PI/2) - time) * 0.05;
-        if (shake > 0.1) shake *= 0.8; else shake = 0;
-        parts.forEach(p => { p.y -= p.v; if (p.y < -10) p.y = uiCanvas.height + 10; });
+            if (isAutoTime) time += 0.005;
+            else time += ((manualNight === 1 ? Math.PI/2 : -Math.PI/2) - time) * 0.05;
+            if (shake > 0.1) shake *= 0.8; else shake = 0;
+            parts.forEach(p => { p.y -= p.v; if (p.y < -10) p.y = uiCanvas.height + 10; });
 
-        if (isWarping) {
-            fade += 0.08; 
-            if (fade >= 1) {
-                currentKey = warpData.to; 
-                level = levels[currentKey];
-                player.gx = warpData.tx; 
-                player.gy = warpData.ty;
-                player.rx = player.gx * 16; 
-                player.ry = player.gy * 16;
-                isWarping = false; 
-                dialogue = false; // Always close dialogue on warp
-            }
-            return;
-        } else if (fade > 0) fade -= 0.08;
+            if (isWarping) {
+                fade += 0.08; 
+                if (fade >= 1) {
+                    currentKey = warpData.to; level = levels[currentKey];
+                    player.gx = warpData.tx; player.gy = warpData.ty;
+                    player.rx = player.gx * 16; player.ry = player.gy * 16;
+                    isWarping = false; dialogue = false;
+                }
+                return;
+            } else if (fade > 0) fade -= 0.08;
 
-        const atTarget = Math.abs(player.rx - player.gx*16) < 0.5 && Math.abs(player.ry - player.gy*16) < 0.5;
-        
-        // --- FIXED: Warp check now runs regardless of dialogue ---
-        if (atTarget) {
-            const w = level.warps.find(wp => wp.x === player.gx && wp.y === player.gy);
-            if (w) { 
-                isWarping = true; 
-                warpData = w; 
-                return; 
-            }
+            const atTarget = Math.abs(player.rx - player.gx*16) < 0.5 && Math.abs(player.ry - player.gy*16) < 0.5;
+            if (atTarget) {
+                const w = level.warps.find(wp => wp.x === player.gx && wp.y === player.gy);
+                if (w) { isWarping = true; warpData = w; return; }
 
-            if (!dialogue) {
-                let nx = player.gx, ny = player.gy;
-                if (keys['w']) ny--; else if (keys['s']) ny++; else if (keys['a']) nx--; else if (keys['d']) nx++;
-                
-                // Permission check
-                if (level.map[ny] && level.map[ny][nx] !== 1 && !(nx === level.npc.x && ny === level.npc.y)) {
-                    if (!level.chests.some(c => c.x === nx && c.y === ny)) {
-                        player.gx = nx; player.gy = ny;
+                if (!dialogue) {
+                    let nx = player.gx, ny = player.gy;
+                    if (keys['w']) ny--; else if (keys['s']) ny++; else if (keys['a']) nx--; else if (keys['d']) nx++;
+                    if (level.map[ny] && level.map[ny][nx] !== 1 && !(nx === level.npc.x && ny === level.npc.y)) {
+                        if (!level.chests.some(c => c.x === nx && c.y === ny)) {
+                            player.gx = nx; player.gy = ny;
+                        }
                     }
                 }
-            }
-            player.anim = 0;
-        } else { 
-            player.anim += 0.25; 
+                player.anim = 0;
+            } else { player.anim += 0.25; }
+            player.rx += (player.gx * 16 - player.rx) * player.s;
+            player.ry += (player.gy * 16 - player.ry) * player.s;
         }
-
-        player.rx += (player.gx * 16 - player.rx) * player.s;
-        player.ry += (player.gy * 16 - player.ry) * player.s;
-    } catch (e) { console.error("Update loop error:", e); }
-}
 
         function draw() {
             update();
