@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>JS RPG - Pixel Rain Battle</title>
+    <title>JS RPG - Pixel Rain Transition</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { position: absolute; }
@@ -25,31 +25,17 @@
         const tileSize = 16;
         const keys = {};
 
-        // --- LEVEL DEFINITIONS ---
+        // --- LEVELS ---
         const levels = {
             town: {
-                map: [
-                    [1,1,1,1,1,1,1,1,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,1], // Warp door at x4, y4
-                    [1,1,1,1,1,1,1,1,1]
-                ],
-                npc: { x: 7, y: 2, color: '#3498db', msg: "Press 'B' to start the Pixel Rain battle!" },
+                map: [[1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,1,1,1,0,1,1,1,1],[1,0,0,0,0,0,0,0,1]],
+                npc: { x: 7, y: 2, color: '#3498db', msg: "Press 'B' for the Pixel Dissolve transition!" },
                 warps: [{ x: 4, y: 4, to: 'house', tx: 4, ty: 4 }],
                 chests: []
             },
             house: {
-                map: [
-                    [1,1,1,1,1,1,1,1,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,1],
-                    [1,1,1,1,0,1,1,1,1] // Exit rug at x4, y5
-                ],
-                npc: { x: 2, y: 1, color: '#9b59b6', msg: "It's cozy in here." },
+                map: [[1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,1,1,1,0,1,1,1,1],[1,0,0,0,0,0,0,0,1]],
+                npc: { x: 2, y: 1, color: '#9b59b6', msg: "Stay as long as you like." },
                 warps: [{ x: 4, y: 5, to: 'town', tx: 4, ty: 5 }],
                 chests: [{ x: 6, y: 2, opened: false, item: "Rusty Sword", color: "#d35400" }]
             }
@@ -64,20 +50,21 @@
         let dialogue = false, diagMsg = "";
         let isAutoTime = true, manualNight = 0;
 
-        // --- PIXEL RAIN STATE ---
-        let rainGrid = [];
-        const RAIN_BLOCK_SIZE = 30; 
+        // --- PIXEL RAIN / DISSOLVE SYSTEM ---
+        let transitionBlocks = [];
+        const BLOCK_SIZE = 24; // Size of the dissolving pixels
 
-        const player = { gx: 2, gy: 2, rx: 32, ry: 32, s: 0.18, anim: 0, color: '#e74c3c' };
-
-        function initParts() {
-            parts = Array.from({length: 30}, () => ({ x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight, v: 0.2 + Math.random() * 0.5 }));
-        }
-
-        function initRainGrid() {
-            const cols = Math.ceil(uiCanvas.width / RAIN_BLOCK_SIZE);
-            const rows = Math.ceil(uiCanvas.height / RAIN_BLOCK_SIZE);
-            rainGrid = Array(cols * rows).fill(0);
+        function initTransition() {
+            transitionBlocks = [];
+            const cols = Math.ceil(uiCanvas.width / BLOCK_SIZE);
+            const rows = Math.ceil(uiCanvas.height / BLOCK_SIZE);
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    transitionBlocks.push({ x: x * BLOCK_SIZE, y: y * BLOCK_SIZE, filled: false });
+                }
+            }
+            // Shuffle blocks for a random dissolve feel
+            transitionBlocks.sort(() => Math.random() - 0.5);
         }
 
         function resize() {
@@ -87,8 +74,7 @@
             uiCanvas.width = w; uiCanvas.height = h;
             ctx.imageSmoothingEnabled = false;
             [canvas, uiCanvas].forEach(c => { c.style.width = `${w}px`; c.style.height = `${h}px`; });
-            initParts();
-            if (gameState === 'TRANSITION') initRainGrid();
+            parts = Array.from({length: 30}, () => ({ x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight, v: 0.2 + Math.random() * 0.5 }));
         }
 
         window.addEventListener('resize', resize);
@@ -98,7 +84,7 @@
             if (k === 'n') { isAutoTime = !isAutoTime; if(!isAutoTime) manualNight = (Math.sin(time) > 0) ? 0 : 1; }
             if (k === 'b' && gameState === 'EXPLORE') {
                 gameState = 'TRANSITION';
-                initRainGrid();
+                initTransition();
                 dialogue = false;
             }
             if (k === 'e' && !isWarping && gameState === 'EXPLORE') {
@@ -114,16 +100,20 @@
         });
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
+        const player = { gx: 2, gy: 2, rx: 32, ry: 32, s: 0.18, anim: 0, color: '#e74c3c' };
+
         function update() {
             if (gameState === 'TRANSITION') {
-                // Fill 15 blocks per frame
-                for(let i = 0; i < 15; i++) {
-                    let idx = Math.floor(Math.random() * rainGrid.length);
-                    rainGrid[idx] = 1;
+                // Fill 25 blocks per frame
+                let filledThisFrame = 0;
+                for (let b of transitionBlocks) {
+                    if (!b.filled) {
+                        b.filled = true;
+                        filledThisFrame++;
+                        if (filledThisFrame > 25) break;
+                    }
                 }
-                if (rainGrid.every(cell => cell === 1)) {
-                    gameState = 'BATTLE';
-                }
+                if (transitionBlocks.every(b => b.filled)) gameState = 'BATTLE';
                 return;
             }
 
@@ -158,8 +148,7 @@
                         }
                     }
                 }
-                player.anim = 0;
-            } else { player.anim += 0.25; }
+            }
             player.rx += (player.gx * 16 - player.rx) * player.s;
             player.ry += (player.gy * 16 - player.ry) * player.s;
         }
@@ -170,12 +159,11 @@
             if (gameState === 'BATTLE') {
                 ctx.fillStyle = '#002'; ctx.fillRect(0, 0, canvas.width, canvas.height);
                 uiCtx.fillStyle = 'white'; uiCtx.font = '30px serif';
-                uiCtx.fillText("BATTLE SCREEN", 100, 100);
-                uiCtx.fillText("Press F5 to Restart", 100, 150);
+                uiCtx.fillText("BATTLE: Slime Appears!", 100, 100);
                 return;
             }
 
-            const mW = level.map.length * 16, mH = level.map.length * 16;
+            const mW = level.map[0].length * 16, mH = level.map.length * 16;
             let cx = Math.max(0, Math.min(player.rx - canvas.width/2 + 8, mW - canvas.width));
             let cy = Math.max(0, Math.min(player.ry - canvas.height/2 + 8, mH - canvas.height));
             if (shake > 0) { cx += (Math.random()-0.5)*shake; cy += (Math.random()-0.5)*shake; }
@@ -184,39 +172,36 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             uiCtx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
 
+            // Draw World
             level.map.forEach((row, y) => row.forEach((tile, x) => {
                 const isDoor = level.warps.some(w => w.x === x && w.y === y);
                 ctx.fillStyle = tile === 1 ? '#1a252f' : (isDoor ? '#3498db' : '#27ae60');
                 ctx.fillRect(Math.round(x*16 - rx), Math.round(y*16 - ry), 16, 16);
             }));
 
-            const pY = player.ry - Math.abs(Math.sin(player.anim)) * 3;
-            const ents = [{x:player.rx, y:pY, c:player.color}, {x:level.npc.x*16, y:level.npc.y*16 - Math.sin(Date.now()/600)*0.5, c:level.npc.color}];
+            // Entities
+            const pY = player.ry - Math.abs(Math.sin(Date.now()/200)) * 2;
+            const ents = [{x:player.rx, y:pY, c:player.color}, {x:level.npc.x*16, y:level.npc.y*16, c:level.npc.color}];
             level.chests.forEach(c => ents.push({x: c.x*16, y: c.y*16, c: c.color}));
-            ents.sort((a,b)=>a.y-b.y).forEach(e => { ctx.fillStyle = e.c; ctx.fillRect(Math.round(e.x-rx), Math.round(e.y-ry), 16, 16); });
+            ents.forEach(e => { ctx.fillStyle = e.c; ctx.fillRect(Math.round(e.x-rx), Math.round(e.y-ry), 16, 16); });
 
+            // Post-Processing
             const night = (Math.sin(time) + 1) / 2;
-            uiCtx.fillStyle = `rgba(10, 10, 40, ${night * 0.45})`;
+            uiCtx.fillStyle = `rgba(10, 10, 40, ${night * 0.4})`;
             uiCtx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
-            parts.forEach(p => { uiCtx.fillStyle = `rgba(255, 200, 150, ${0.3 + night*0.4})`; uiCtx.beginPath(); uiCtx.arc(p.x, p.y, 2, 0, 7); uiCtx.fill(); });
+            parts.forEach(p => { uiCtx.fillStyle = `rgba(255, 200, 150, 0.6)`; uiCtx.beginPath(); uiCtx.arc(p.x, p.y, 2, 0, 7); uiCtx.fill(); });
 
             if (dialogue) {
-                uiCtx.fillStyle = 'rgba(15,20,30,0.9)'; uiCtx.strokeStyle='#d4af37'; uiCtx.lineWidth=3;
-                uiCtx.strokeRect(60, uiCanvas.height-160, uiCanvas.width-120, 100); uiCtx.fillRect(60, uiCanvas.height-160, uiCanvas.width-120, 100);
+                uiCtx.fillStyle = 'rgba(15,20,30,0.9)'; uiCtx.fillRect(60, uiCanvas.height-160, uiCanvas.width-120, 100);
                 uiCtx.fillStyle='#eee'; uiCtx.font='italic 22px serif'; uiCtx.fillText(diagMsg, 100, uiCanvas.height-100);
             }
 
-            // --- PIXEL RAIN TRANSITION ---
+            // --- THE PIXEL DISSOLVE DRAW ---
             if (gameState === 'TRANSITION') {
                 uiCtx.fillStyle = 'black';
-                const cols = Math.ceil(uiCanvas.width / RAIN_BLOCK_SIZE);
-                rainGrid.forEach((cell, i) => {
-                    if (cell === 1) {
-                        const x = (i % cols) * RAIN_BLOCK_SIZE;
-                        const y = Math.floor(i / cols) * RAIN_BLOCK_SIZE;
-                        uiCtx.fillRect(x, y, RAIN_BLOCK_SIZE, RAIN_BLOCK_SIZE);
-                    }
-                });
+                for (let b of transitionBlocks) {
+                    if (b.filled) uiCtx.fillRect(b.x, b.y, BLOCK_SIZE, BLOCK_SIZE);
+                }
             }
 
             if (fade > 0) { uiCtx.fillStyle = `rgba(0,0,0,${fade})`; uiCtx.fillRect(0,0,uiCanvas.width,uiCanvas.height); }
