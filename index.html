@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>JS RPG - Fixed Warps & Embers</title>
+    <title>JS RPG - Stable Build</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { position: absolute; }
@@ -25,51 +25,49 @@
         const tileSize = 16;
         const keys = {};
 
+        // --- LEVELS (Guaranteed Data) ---
         const levels = {
             town: {
                 map: [
                     [1,1,1,1,1,1,1,1,1,1],
                     [1,0,0,0,0,0,0,0,0,1],
                     [1,0,0,0,0,0,0,0,0,1],
-                    [1,1,1,1,0,1,1,1,1,1], // Blue door at x:4
+                    [1,0,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,0,1,1,1,1,1], // Door at x4, y4
                     [1,0,0,0,0,0,0,0,0,1],
                     [1,1,1,1,1,1,1,1,1,1]
                 ],
-                npc: { gridX: 7, gridY: 4, color: '#3498db', message: "Welcome traveler. Walk into the blue door to enter the house." },
-                warps: [{ x: 4, y: 3, targetLevel: 'house', targetX: 4, targetY: 4 }]
+                npc: { x: 7, y: 2, color: '#3498db', msg: "Welcome to Town! Enter the blue door." },
+                warps: [{ x: 4, y: 4, to: 'house', tx: 4, ty: 3 }]
             },
             house: {
                 map: [
-                    [1,1,1,1,1,1,1,1,1,1],
-                    [1,0,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,0,1],
-                    [1,0,0,0,0,0,0,0,0,1],
-                    [1,1,1,1,0,1,1,1,1,1] // Exit at x:4, y:5
+                    [1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,0,1,1,1,1], // Exit at x4, y3
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,1,1,1,1,1]
                 ],
-                npc: { gridX: 2, gridY: 2, color: '#9b59b6', message: "Make yourself at home. Step on the rug to leave." },
-                warps: [{ x: 4, y: 5, targetLevel: 'town', targetX: 4, targetY: 4 }]
+                npc: { x: 2, y: 1, color: '#9b59b6', msg: "Cozy home! Step on the blue rug to leave." },
+                warps: [{ x: 4, y: 3, to: 'town', tx: 4, ty: 5 }]
             }
         };
 
         let currentKey = 'town';
         let level = levels[currentKey];
-        let fade = 0, isTransitioning = false, transitionData = null;
-        let timeOfDay = 0, shake = 0, particles = [];
-        let showDialogue = false;
+        let fade = 0, isWarping = false, warpData = null;
+        let time = 0, shake = 0, parts = [];
+        let dialogue = false;
 
-        const player = { gridX: 2, gridY: 4, realX: 32, realY: 64, speed: 0.15, walkTimer: 0, color: '#e74c3c' };
+        const player = { gx: 2, gy: 2, rx: 32, ry: 32, s: 0.15, anim: 0, color: '#e74c3c' };
 
-        function initParticles() {
-            particles = [];
-            for (let i = 0; i < 50; i++) {
-                particles.push({
-                    x: Math.random() * window.innerWidth,
-                    y: Math.random() * window.innerHeight,
-                    s: 0.3 + Math.random() * 0.8,
-                    o: Math.random() * Math.PI * 2
-                });
-            }
+        function initParts() {
+            parts = Array.from({length: 30}, () => ({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+                v: 0.2 + Math.random() * 0.5
+            }));
         }
 
         function resize() {
@@ -79,116 +77,98 @@
             uiCanvas.width = w; uiCanvas.height = h;
             ctx.imageSmoothingEnabled = false;
             [canvas, uiCanvas].forEach(c => { c.style.width = `${w}px`; c.style.height = `${h}px`; });
-            initParticles();
+            initParts();
         }
 
         window.addEventListener('resize', resize);
         window.addEventListener('keydown', e => {
             keys[e.key.toLowerCase()] = true;
-            if (e.key.toLowerCase() === 'e' && !isTransitioning) {
-                const dist = Math.abs(player.gridX - level.npc.gridX) + Math.abs(player.gridY - level.npc.gridY);
-                if (dist === 1) { showDialogue = !showDialogue; if(showDialogue) shake = 4; }
+            if (e.key === 'e' && !isWarping) {
+                const d = Math.abs(player.gx - level.npc.x) + Math.abs(player.gy - level.npc.y);
+                if (d === 1) { dialogue = !dialogue; if(dialogue) shake = 4; }
             }
         });
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
         function update() {
-            timeOfDay += 0.005;
-            if (shake > 0.1) shake *= 0.9; else shake = 0;
+            time += 0.005;
+            if (shake > 0.1) shake *= 0.8; else shake = 0;
 
-            // Move particles and wrap around screen
-            particles.forEach(p => {
-                p.y -= p.s;
-                p.x += Math.sin(p.o + timeOfDay) * 0.3;
+            // Particle drift
+            parts.forEach(p => {
+                p.y -= p.v;
                 if (p.y < -10) p.y = uiCanvas.height + 10;
-                if (p.x < -10) p.x = uiCanvas.width + 10;
-                if (p.x > uiCanvas.width + 10) p.x = -10;
             });
 
-            if (isTransitioning) {
-                fade += 0.04;
+            if (isWarping) {
+                fade += 0.05;
                 if (fade >= 1) {
-                    currentKey = transitionData.targetLevel;
+                    currentKey = warpData.to;
                     level = levels[currentKey];
-                    player.gridX = transitionData.targetX;
-                    player.gridY = transitionData.targetY;
-                    player.realX = player.gridX * 16;
-                    player.realY = player.gridY * 16;
-                    isTransitioning = false;
-                    showDialogue = false;
+                    player.gx = warpData.tx; player.gy = warpData.ty;
+                    player.rx = player.gx * 16; player.ry = player.gy * 16;
+                    isWarping = false; dialogue = false;
                 }
                 return;
-            } else if (fade > 0) fade -= 0.04;
+            } else if (fade > 0) fade -= 0.05;
 
-            const atTarget = Math.abs(player.realX - player.gridX*16) < 0.1 && Math.abs(player.realY - player.gridY*16) < 0.1;
-            if (atTarget && !showDialogue) {
-                let nX = player.gridX, nY = player.gridY;
-                if (keys['w']) nY--; else if (keys['s']) nY++; else if (keys['a']) nX--; else if (keys['d']) nX++;
+            const atT = Math.abs(player.rx - player.gx*16) < 0.1 && Math.abs(player.ry - player.gy*16) < 0.1;
+            if (atT && !dialogue) {
+                let nx = player.gx, ny = player.gy;
+                if (keys['w']) ny--; else if (keys['s']) ny++; else if (keys['a']) nx--; else if (keys['d']) nx++;
                 
-                if (level.map[nY] && level.map[nY][nX] === 0 && !(nX === level.npc.gridX && nY === level.npc.gridY)) {
-                    player.gridX = nX; player.gridY = nY;
-                    const warp = level.warps.find(w => w.x === nX && w.y === nY);
-                    if (warp) { isTransitioning = true; transitionData = warp; }
+                if (level.map[ny] && level.map[ny][nx] === 0 && !(nx === level.npc.x && ny === level.npc.y)) {
+                    player.gx = nx; player.gy = ny;
+                    const w = level.warps.find(wp => wp.x === nx && wp.y === ny);
+                    if (w) { isWarping = true; warpData = w; }
                 }
-                player.walkTimer = 0;
-            } else if (!atTarget) player.walkTimer += 0.25;
+                player.anim = 0;
+            } else if (!atT) player.anim += 0.2;
 
-            player.realX += (player.gridX * 16 - player.realX) * player.speed;
-            player.realY += (player.gridY * 16 - player.realY) * player.speed;
+            player.rx += (player.gx * 16 - player.rx) * player.s;
+            player.ry += (player.gy * 16 - player.ry) * player.s;
         }
 
         function draw() {
             update();
-            const mapW = level.map[0].length * 16, mapH = level.map.length * 16;
-            let cX = Math.max(0, Math.min(player.realX - canvas.width/2 + 8, mapW - canvas.width));
-            let cY = Math.max(0, Math.min(player.realY - canvas.height/2 + 8, mapH - canvas.height));
-            if (shake > 0) { cX += (Math.random()-0.5)*shake; cY += (Math.random()-0.5)*shake; }
-            const rX = Math.round(cX), rY = Math.round(cY);
+            const mW = level.map[0].length * 16, mH = level.map.length * 16;
+            let cx = Math.max(0, Math.min(player.rx - canvas.width/2 + 8, mW - canvas.width));
+            let cy = Math.max(0, Math.min(player.ry - canvas.height/2 + 8, mH - canvas.height));
+            if (shake > 0) { cx += (Math.random()-0.5)*shake; cy += (Math.random()-0.5)*shake; }
+            const rx = Math.round(cx), ry = Math.round(cy);
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             uiCtx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
 
             // Draw Tiles
-            for (let y = 0; y < level.map.length; y++) {
-                for (let x = 0; x < level.map[y].length; x++) {
-                    let isDoor = (currentKey === 'town' && x === 4 && y === 3) || (currentKey === 'house' && x === 4 && y === 5);
-                    ctx.fillStyle = level.map[y][x] === 1 ? '#1a252f' : (isDoor ? '#1e3799' : '#27ae60');
-                    ctx.fillRect(Math.round(x*16 - rX), Math.round(y*16 - rY), 16, 16);
-                }
-            }
+            level.map.forEach((row, y) => row.forEach((tile, x) => {
+                const isDoor = level.warps.some(w => w.x === x && w.y === y);
+                ctx.fillStyle = tile === 1 ? '#1a252f' : (isDoor ? '#3498db' : '#27ae60');
+                ctx.fillRect(Math.round(x*16 - rx), Math.round(y*16 - ry), 16, 16);
+            }));
 
-            // Sorted Characters
-            const pBob = Math.abs(Math.sin(player.walkTimer)) * 3;
-            const nBreath = Math.sin(Date.now()/600) * 0.6;
-            const chars = [
-                {x: player.realX, y: player.realY - pBob, color: player.color},
-                {x: level.npc.gridX * 16, y: level.npc.gridY * 16 - nBreath, color: level.npc.color}
-            ].sort((a,b) => a.y - b.y);
+            // Entities
+            const pY = player.ry - Math.abs(Math.sin(player.anim)) * 3;
+            const nY = level.npc.y * 16 - Math.sin(Date.now()/600) * 0.5;
+            const ents = [{x:player.rx, y:pY, c:player.color}, {x:level.npc.x*16, y:nY, c:level.npc.color}].sort((a,b)=>a.y-b.y);
+            ents.forEach(e => { ctx.fillStyle = e.c; ctx.fillRect(Math.round(e.x-rx), Math.round(e.y-ry), 16, 16); });
 
-            chars.forEach(c => {
-                ctx.fillStyle = c.color;
-                ctx.fillRect(Math.round(c.x - rX), Math.round(c.y - rY), 16, 16);
-            });
-
-            // UI Layer: Atmosphere & Particles
-            const night = (Math.sin(timeOfDay) + 1) / 2;
+            // Atmosphere
+            const night = (Math.sin(time) + 1) / 2;
             uiCtx.fillStyle = `rgba(10, 10, 40, ${night * 0.4})`;
             uiCtx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
-
-            particles.forEach(p => {
-                uiCtx.fillStyle = `rgba(255, ${200 + (1-night)*55}, ${150 + (1-night)*105}, 0.6)`;
-                uiCtx.beginPath(); uiCtx.arc(p.x, p.y, 2, 0, Math.PI*2); uiCtx.fill();
+            parts.forEach(p => {
+                uiCtx.fillStyle = `rgba(255, 200, 150, 0.6)`;
+                uiCtx.beginPath(); uiCtx.arc(p.x, p.y, 2, 0, 7); uiCtx.fill();
             });
 
-            if (showDialogue) {
-                uiCtx.fillStyle = 'rgba(15, 20, 30, 0.95)';
-                uiCtx.strokeStyle = '#d4af37'; uiCtx.lineWidth = 3;
-                uiCtx.strokeRect(60, uiCanvas.height - 180, uiCanvas.width - 120, 120);
-                uiCtx.fillRect(60, uiCanvas.height - 180, uiCanvas.width - 120, 120);
-                uiCtx.fillStyle = '#eee'; uiCtx.font = 'italic 22px serif';
-                uiCtx.fillText(level.npc.message, 100, uiCanvas.height - 110);
+            if (dialogue) {
+                uiCtx.fillStyle = 'rgba(15,20,30,0.9)'; uiCtx.strokeStyle='#d4af37'; uiCtx.lineWidth=3;
+                uiCtx.strokeRect(60, uiCanvas.height-160, uiCanvas.width-120, 100);
+                uiCtx.fillRect(60, uiCanvas.height-160, uiCanvas.width-120, 100);
+                uiCtx.fillStyle='#eee'; uiCtx.font='italic 22px serif';
+                uiCtx.fillText(level.npc.msg, 100, uiCanvas.height-100);
             }
-
             if (fade > 0) { uiCtx.fillStyle = `rgba(0,0,0,${fade})`; uiCtx.fillRect(0,0,uiCanvas.width,uiCanvas.height); }
             requestAnimationFrame(draw);
         }
