@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>JS RPG - Dialogue Fix</title>
+    <title>JS RPG - Battle Transition</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { position: absolute; }
@@ -28,36 +28,25 @@
         // --- LEVELS ---
         const levels = {
             town: {
-                map: [
-                  [1,1,1,1,1,1,1,1,1,1],
-                  [1,0,0,0,0,0,0,0,0,1],
-                  [1,0,0,0,0,0,0,0,0,1],
-                  [1,0,0,0,0,0,0,0,0,1],
-                  [1,0,0,0,0,0,0,0,0,1],
-                  [1,1,1,1,1,1,1,1,1,1]
-                ],
-                npc: { x: 7, y: 2, color: '#3498db', msg: "Check the house for supplies!" },
+                map: [[1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,1,1,1,1,1,1,1,1]],
+                npc: { x: 7, y: 2, color: '#3498db', msg: "Press 'B' to simulate a battle start!" },
                 warps: [{ x: 4, y: 4, to: 'house', tx: 4, ty: 4 }],
                 chests: []
             },
             house: {
-                map: [
-                  [1,1,1,1,1,1,1,1,1,1],
-                  [1,0,0,0,0,0,0,0,0,1],
-                  [1,0,0,0,0,0,0,0,0,1],
-                  [1,0,0,0,0,0,0,0,0,1],
-                  [1,0,0,0,0,0,0,0,0,1],
-                  [1,1,1,1,1,1,1,1,1,1]
-                ],
+                map: [[1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0,1],[1,1,1,1,1,1,1,1,1]],
                 npc: { x: 2, y: 2, color: '#9b59b6', msg: "Did you find my sword?" },
                 warps: [{ x: 4, y: 5, to: 'town', tx: 4, ty: 5 }],
                 chests: [{ x: 6, y: 2, opened: false, item: "Rusty Sword", color: "#d35400" }]
             }
         };
 
+        // --- STATE ---
+        let gameState = 'EXPLORE'; // EXPLORE, TRANSITION, BATTLE
         let currentKey = 'town';
         let level = levels[currentKey];
         let fade = 0, isWarping = false, warpData = null;
+        let battleAnim = 0; // For the swirl effect
         let time = 0, shake = 0, parts = [];
         let dialogue = false, diagMsg = "";
         let isAutoTime = true, manualNight = 0;
@@ -82,41 +71,40 @@
         window.addEventListener('keydown', e => {
             const k = e.key.toLowerCase();
             keys[k] = true;
-            
             if (k === 'n') { isAutoTime = !isAutoTime; if(!isAutoTime) manualNight = (Math.sin(time) > 0) ? 0 : 1; }
+            if (k === 'b' && gameState === 'EXPLORE') startBattle(); // Manual trigger
             
             if (k === 'e' && !isWarping) {
-                // 1. PRIORITY: CLOSE DIALOGUE
-                if (dialogue) {
-                    dialogue = false;
-                    return;
-                }
-
-                // 2. CHECK NPC
+                if (dialogue) { dialogue = false; return; }
                 const dNPC = Math.abs(player.gx - level.npc.x) + Math.abs(player.gy - level.npc.y);
-                if (dNPC === 1) { 
-                    diagMsg = level.npc.msg; 
-                    dialogue = true; 
-                    shake = 3; 
-                    return;
-                }
-
-                // 3. CHECK CHESTS
+                if (dNPC === 1) { diagMsg = level.npc.msg; dialogue = true; shake = 3; return; }
                 level.chests.forEach(c => {
-                    const dC = Math.abs(player.gx - c.x) + Math.abs(player.gy - c.y);
-                    if (dC === 1 && !c.opened) {
-                        c.opened = true;
-                        c.color = "#7f8c8d";
-                        diagMsg = "Found: " + c.item + "!";
-                        dialogue = true;
-                        shake = 8;
+                    if (Math.abs(player.gx - c.x) + Math.abs(player.gy - c.y) === 1 && !c.opened) {
+                        c.opened = true; c.color = "#7f8c8d"; diagMsg = "Found: " + c.item + "!"; dialogue = true; shake = 8;
                     }
                 });
             }
         });
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
+        function startBattle() {
+            gameState = 'TRANSITION';
+            battleAnim = 0;
+            dialogue = false;
+        }
+
         function update() {
+            if (gameState === 'TRANSITION') {
+                battleAnim += 0.02;
+                if (battleAnim >= 1.5) {
+                    gameState = 'BATTLE';
+                    battleAnim = 0;
+                }
+                return;
+            }
+
+            if (gameState === 'BATTLE') return; // Battle logic goes here later
+
             if (isAutoTime) time += 0.005;
             else time += ((manualNight === 1 ? Math.PI/2 : -Math.PI/2) - time) * 0.05;
             if (shake > 0.1) shake *= 0.8; else shake = 0;
@@ -155,7 +143,18 @@
 
         function draw() {
             update();
-            const mW = level.map[0].length * 16, mH = level.map.length * 16;
+            
+            if (gameState === 'BATTLE') {
+                ctx.fillStyle = '#002'; // Battle Arena Background
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                uiCtx.fillStyle = 'white';
+                uiCtx.font = '30px serif';
+                uiCtx.fillText("BATTLE BEGINS", 100, 100);
+                uiCtx.fillText("Press F5 to restart for now!", 100, 150);
+                return;
+            }
+
+            const mW = level.map.length * 16, mH = level.map.length * 16;
             let cx = Math.max(0, Math.min(player.rx - canvas.width/2 + 8, mW - canvas.width));
             let cy = Math.max(0, Math.min(player.ry - canvas.height/2 + 8, mH - canvas.height));
             if (shake > 0) { cx += (Math.random()-0.5)*shake; cy += (Math.random()-0.5)*shake; }
@@ -171,8 +170,7 @@
             }));
 
             const pY = player.ry - Math.abs(Math.sin(player.anim)) * 3;
-            const nY = level.npc.y * 16 - Math.sin(Date.now()/600)*0.5;
-            const ents = [{x:player.rx, y:pY, c:player.color}, {x:level.npc.x*16, y:nY, c:level.npc.color}];
+            const ents = [{x:player.rx, y:pY, c:player.color}, {x:level.npc.x*16, y:level.npc.y*16 - Math.sin(Date.now()/600)*0.5, c:level.npc.color}];
             level.chests.forEach(c => ents.push({x: c.x*16, y: c.y*16, c: c.color}));
             ents.sort((a,b)=>a.y-b.y).forEach(e => { ctx.fillStyle = e.c; ctx.fillRect(Math.round(e.x-rx), Math.round(e.y-ry), 16, 16); });
 
@@ -186,6 +184,15 @@
                 uiCtx.strokeRect(60, uiCanvas.height-160, uiCanvas.width-120, 100); uiCtx.fillRect(60, uiCanvas.height-160, uiCanvas.width-120, 100);
                 uiCtx.fillStyle='#eee'; uiCtx.font='italic 22px serif'; uiCtx.fillText(diagMsg, 100, uiCanvas.height-100);
             }
+
+            // --- BATTLE TRANSITION SWIRL ---
+            if (gameState === 'TRANSITION') {
+                uiCtx.fillStyle = 'black';
+                uiCtx.beginPath();
+                uiCtx.arc(uiCanvas.width/2, uiCanvas.height/2, battleAnim * uiCanvas.width, 0, Math.PI * 2);
+                uiCtx.fill();
+            }
+
             if (fade > 0) { uiCtx.fillStyle = `rgba(0,0,0,${fade})`; uiCtx.fillRect(0,0,uiCanvas.width,uiCanvas.height); }
             requestAnimationFrame(draw);
         }
