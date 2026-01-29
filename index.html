@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>JS RPG - Sprite Edition</title>
+    <title>JS RPG - Fail-Safe Version</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { position: absolute; }
@@ -20,13 +20,15 @@
         const uiCanvas = document.getElementById('uiCanvas');
         const uiCtx = uiCanvas.getContext('2d');
 
-        // --- SPRITE LOADING ---
+        // --- ASSET LOADING ---
         const spriteSheet = new Image();
         spriteSheet.crossOrigin = "anonymous"; 
-        spriteSheet.src = 'https://i.imgur.com'; // 16x16 Generic RPG Sheet
+        spriteSheet.src = 'https://i.imgur.com'; 
         let spritesLoaded = false;
         spriteSheet.onload = () => { spritesLoaded = true; };
+        spriteSheet.onerror = () => { console.error("Sprite failed to load. Using colors."); };
 
+        // --- CONFIG ---
         const ASPECT_RATIO = 16 / 9;
         const scale = 3.5; 
         const tileSize = 16;
@@ -38,27 +40,26 @@
 
         const player = { 
             type: 'player', gridX: 4, gridY: 4, realX: 4*16, realY: 4*16, 
-            speed: 0.15, walkTimer: 0, spriteCol: 0, spriteRow: 0 
+            speed: 0.15, walkTimer: 0, spriteCol: 0, spriteRow: 0, color: '#e74c3c'
         };
 
         const npc = { 
             type: 'npc', gridX: 8, gridY: 6, realX: 8*16, realY: 6*16,
-            breathTimer: 0, spriteCol: 1, spriteRow: 0,
-            message: "The pixels have taken form! Press 'E' to close." 
+            breathTimer: 0, spriteCol: 1, spriteRow: 0, color: '#3498db',
+            message: "The world is visible once more!" 
         };
 
-        // Re-filling worldMap to fix the black screen issue
+        // --- WORLD MAP (Hardcoded data to prevent black screen) ---
         const worldMap = [
-            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-            [1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1],
-            [1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1],
-            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+            [1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1]
         ];
 
         let showDialogue = false;
@@ -66,7 +67,12 @@
         function initParticles() {
             particles.length = 0;
             for(let i=0; i<40; i++) {
-                particles.push({ x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight, s: 0.2 + Math.random() * 0.5, o: Math.random() * Math.PI * 2 });
+                particles.push({ 
+                    x: Math.random() * window.innerWidth, 
+                    y: Math.random() * window.innerHeight, 
+                    s: 0.2 + Math.random() * 0.5, 
+                    o: Math.random() * Math.PI * 2 
+                });
             }
         }
 
@@ -133,7 +139,7 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             uiCtx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
 
-            // 1. Map
+            // 1. Draw Map
             for (let y = 0; y < worldMap.length; y++) {
                 for (let x = 0; x < worldMap[y].length; x++) {
                     ctx.fillStyle = worldMap[y][x] === 1 ? '#1a252f' : '#27ae60';
@@ -149,18 +155,23 @@
                 ctx.fill();
             });
 
-            // 3. Sprites
-            if (spritesLoaded) {
-                const renderList = [player, npc].sort((a, b) => a.realY - b.realY);
-                renderList.forEach(ent => {
-                    const off = (ent.type === 'npc') ? Math.sin(npc.breathTimer) * 0.5 : Math.abs(Math.sin(player.walkTimer)) * 3;
+            // 3. Characters (Sprite with Fallback)
+            const renderList = [player, npc].sort((a, b) => a.realY - b.realY);
+            renderList.forEach(ent => {
+                const off = (ent.type === 'npc') ? Math.sin(npc.breathTimer) * 0.5 : Math.abs(Math.sin(player.walkTimer)) * 3;
+                
+                if (spritesLoaded) {
                     ctx.drawImage(
                         spriteSheet,
                         ent.spriteCol * tileSize, ent.spriteRow * tileSize, tileSize, tileSize, 
                         Math.round(ent.realX - rX), Math.round(ent.realY - rY - off), tileSize, tileSize
                     );
-                });
-            }
+                } else {
+                    // Fail-safe color square
+                    ctx.fillStyle = ent.color;
+                    ctx.fillRect(Math.round(ent.realX - rX), Math.round(ent.realY - rY - off), tileSize, tileSize);
+                }
+            });
 
             // 4. Atmosphere
             const nightVal = (Math.sin(timeOfDay) + 1) / 2;
