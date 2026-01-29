@@ -22,8 +22,8 @@
 
         // --- SPRITE LOADING ---
         const spriteSheet = new Image();
-        spriteSheet.crossOrigin = "anonymous"; // Helps with loading from external URLs
-        spriteSheet.src = 'https://i.imgur.com'; // Generic 16x16 RPG sheet
+        spriteSheet.crossOrigin = "anonymous"; 
+        spriteSheet.src = 'https://i.imgur.com'; // 16x16 Generic RPG Sheet
         let spritesLoaded = false;
         spriteSheet.onload = () => { spritesLoaded = true; };
 
@@ -38,18 +38,29 @@
 
         const player = { 
             type: 'player', gridX: 4, gridY: 4, realX: 4*16, realY: 4*16, 
-            speed: 0.15, walkTimer: 0, 
-            spriteCol: 0, spriteRow: 0 // Position on the sprite sheet
+            speed: 0.15, walkTimer: 0, spriteCol: 0, spriteRow: 0 
         };
 
         const npc = { 
             type: 'npc', gridX: 8, gridY: 6, realX: 8*16, realY: 6*16,
-            breathTimer: 0, 
-            spriteCol: 1, spriteRow: 0,
-            message: "I am but a sprite now. Technology is wondrous!" 
+            breathTimer: 0, spriteCol: 1, spriteRow: 0,
+            message: "The pixels have taken form! Press 'E' to close." 
         };
 
-        const worldMap = [,,,,,,,,,];
+        // Re-filling worldMap to fix the black screen issue
+        const worldMap = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+
         let showDialogue = false;
 
         function initParticles() {
@@ -113,7 +124,7 @@
 
         function draw() {
             update();
-            const mapW = worldMap.length * tileSize, mapH = worldMap.length * tileSize;
+            const mapW = worldMap[0].length * tileSize, mapH = worldMap.length * tileSize;
             let camX = clamp(player.realX - canvas.width/2 + 8, 0, mapW - canvas.width);
             let camY = clamp(player.realY - canvas.height/2 + 8, 0, mapH - canvas.height);
             if (shake > 0) { camX += (Math.random() - 0.5) * shake; camY += (Math.random() - 0.5) * shake; }
@@ -138,16 +149,15 @@
                 ctx.fill();
             });
 
-            // 3. Characters (Sprites)
+            // 3. Sprites
             if (spritesLoaded) {
                 const renderList = [player, npc].sort((a, b) => a.realY - b.realY);
                 renderList.forEach(ent => {
                     const off = (ent.type === 'npc') ? Math.sin(npc.breathTimer) * 0.5 : Math.abs(Math.sin(player.walkTimer)) * 3;
-                    
                     ctx.drawImage(
                         spriteSheet,
-                        ent.spriteCol * tileSize, ent.spriteRow * tileSize, tileSize, tileSize, // Source crop
-                        Math.round(ent.realX - rX), Math.round(ent.realY - rY - off), tileSize, tileSize // Destination
+                        ent.spriteCol * tileSize, ent.spriteRow * tileSize, tileSize, tileSize, 
+                        Math.round(ent.realX - rX), Math.round(ent.realY - rY - off), tileSize, tileSize
                     );
                 });
             }
@@ -156,12 +166,10 @@
             const nightVal = (Math.sin(timeOfDay) + 1) / 2;
             uiCtx.fillStyle = `rgba(10, 10, 40, ${nightVal * 0.5})`;
             uiCtx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
-
             particles.forEach(p => {
                 uiCtx.fillStyle = `rgba(255, ${220 + (1-nightVal)*35}, ${180 + (1-nightVal)*75}, ${0.4 + Math.sin(timeOfDay + p.o)*0.2})`;
                 uiCtx.beginPath(); uiCtx.arc(p.x, p.y, 1.8, 0, Math.PI * 2); uiCtx.fill();
             });
-            
             const v = uiCtx.createRadialGradient(uiCanvas.width/2, uiCanvas.height/2, uiCanvas.width/4, uiCanvas.width/2, uiCanvas.height/2, uiCanvas.width/1.1);
             v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, `rgba(0,0,0,${0.3 + nightVal * 0.4})`);
             uiCtx.fillStyle = v; uiCtx.fillRect(0, 0, uiCanvas.width, uiCanvas.height);
