@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>JS RPG - Stable Transitions</title>
+    <title>JS RPG - Fixed Warps</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { position: absolute; }
@@ -28,28 +28,27 @@
         const levels = {
             town: {
                 map: [
-                   [1,1,1,1,1,1,1,1,1,1],
-                   [1,0,0,0,0,0,0,0,0,1],
-                   [1,0,0,0,0,0,0,0,0,1],
-                   [1,0,0,0,0,0,0,0,0,1],
-                   [1,1,1,1,0,1,1,1,1,1], // Door at 4,4
-                   [1,0,0,0,0,0,0,0,0,1],
-                   [1,1,1,1,1,1,1,1,1,1]
+                    [1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,1], // Door at 4,4
+                    [1,1,1,1,1,1,1,1,1]
                 ],
-                npc: { x: 7, y: 2, color: '#3498db', msg: "Press 'N' for Night. Walk into the blue door!" },
+                npc: { x: 7, y: 2, color: '#3498db', msg: "Walk into the blue door to enter!" },
                 warps: [{ x: 4, y: 4, to: 'house', tx: 4, ty: 3 }]
             },
             house: {
                 map: [
-                   [1,1,1,1,1,1,1,1,1,1],
-                   [1,0,0,0,0,0,0,0,0,1],
-                   [1,0,0,0,0,0,0,0,0,1],
-                   [1,1,1,1,0,1,1,1,1,1], // Exit at 4,3
-                   [1,0,0,0,0,0,0,0,0,1],
-                   [1,1,1,1,1,1,1,1,1,1]
+                    [1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,0,1,1,1,1], // Exit at 4,3
+                    [1,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,1,1,1,1,1]
                 ],
-                npc: { x: 2, y: 1, color: '#9b59b6', msg: "Step on the blue rug to head back outside." },
-                warps: [{ x: 4, y: 3, to: 'town', tx: 4, ty: 5 }]
+                npc: { x: 2, y: 1, color: '#9b59b6', msg: "Step on the blue rug to leave." },
+                warps: [{ x: 4, y: 3, to: 'town', tx: 4, ty: 3 }] 
             }
         };
 
@@ -61,7 +60,8 @@
         let isAutoTime = true;
         let manualNight = 0;
 
-        const player = { gx: 2, gy: 2, rx: 32, ry: 32, s: 0.15, anim: 0, color: '#e74c3c' };
+        // Player spawns at y=2 in town (away from the door)
+        const player = { gx: 2, gy: 2, rx: 32, ry: 32, s: 0.18, anim: 0, color: '#e74c3c' };
 
         function initParts() {
             parts = Array.from({length: 30}, () => ({
@@ -104,33 +104,41 @@
             parts.forEach(p => { p.y -= p.v; if (p.y < -10) p.y = uiCanvas.height + 10; });
 
             if (isWarping) {
-                fade += 0.05;
+                fade += 0.06; // Faster fade
                 if (fade >= 1) {
                     currentKey = warpData.to;
                     level = levels[currentKey];
-                    player.gx = warpData.tx; player.gy = warpData.ty;
-                    player.rx = player.gx * 16; player.ry = player.gy * 16;
+                    player.gx = warpData.tx; 
+                    player.gy = warpData.ty;
+                    // Offset spawn slightly away from the warp tile to prevent immediate re-warp
+                    if (currentKey === 'town') player.gy = warpData.ty - 1; 
+                    if (currentKey === 'house') player.gy = warpData.ty + 1;
+
+                    player.rx = player.gx * 16; 
+                    player.ry = player.gy * 16;
                     isWarping = false; dialogue = false;
                 }
                 return;
-            } else if (fade > 0) fade -= 0.05;
+            } else if (fade > 0) fade -= 0.06;
 
-            const atT = Math.abs(player.rx - player.gx*16) < 0.2 && Math.abs(player.ry - player.gy*16) < 0.2;
-            if (atT) {
-                // Warp Check (Now checks standing position even if not moving)
-                const w = level.warps.find(wp => wp.x === player.gx && wp.y === player.gy);
-                if (w && !isWarping) { isWarping = true; warpData = w; return; }
+            // Movement logic
+            const atTarget = Math.abs(player.rx - player.gx*16) < 0.5 && Math.abs(player.ry - player.gy*16) < 0.5;
+            
+            if (atTarget && !dialogue) {
+                let nx = player.gx, ny = player.gy;
+                if (keys['w']) ny--; else if (keys['s']) ny++; else if (keys['a']) nx--; else if (keys['d']) nx++;
+                
+                if (level.map[ny] && level.map[ny][nx] !== 1 && !(nx === level.npc.x && ny === level.npc.y)) {
+                    // Start moving to new tile
+                    player.gx = nx; player.gy = ny;
 
-                if (!dialogue) {
-                    let nx = player.gx, ny = player.gy;
-                    if (keys['w']) ny--; else if (keys['s']) ny++; else if (keys['a']) nx--; else if (keys['d']) nx++;
-                    if (level.map[ny] && level.map[ny][nx] === 0 && !(nx === level.npc.x && ny === level.npc.y)) {
-                        player.gx = nx; player.gy = ny;
-                    }
+                    // IMMEDIATE WARP CHECK
+                    const w = level.warps.find(wp => wp.x === nx && wp.y === ny);
+                    if (w) { isWarping = true; warpData = w; return; }
                 }
                 player.anim = 0;
             } else {
-                player.anim += 0.2;
+                player.anim += 0.25;
             }
 
             player.rx += (player.gx * 16 - player.rx) * player.s;
