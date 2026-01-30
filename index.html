@@ -3,17 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Alpha | Dreadnought Edition</title>
+    <title>Project Alpha | Dreadnought Command</title>
+    <!-- Premium 2D-HD Fonts -->
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <style>
-        :root { --glow: #fff; --bg: #010103; --cyan: #00f2ff; --orange: #ff8c00; }
+        :root { --glow: #fff; --bg: #010103; --cyan: #00f2ff; }
         body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        
         #game-wrapper { position: relative; width: 800px; height: 600px; border: 1px solid #333; overflow: hidden; background: #000; box-shadow: 0 0 100px #000; }
         canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
+        
+        /* CRT Scanline Aesthetic */
         #crt-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%); background-size: 100% 3px; pointer-events: none; z-index: 100; }
         
         .ui-layer { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; color: white; }
         
+        /* Octopath Style Title */
         #main-title {
             font-family: 'Cinzel Decorative', serif; font-size: 54px; letter-spacing: 12px; margin: 0;
             color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan);
@@ -26,13 +31,19 @@
         }
 
         .menu-options { margin-top: 100px; display: flex; flex-direction: column; gap: 12px; }
+        
+        /* Fire Emblem / Octopath Style Buttons */
         .menu-btn { 
             background: none; border: none; color: rgba(255,255,255,0.4); font-size: 20px; padding: 10px 40px; cursor: pointer; 
             font-family: 'IBM Plex Mono', monospace; transition: 0.4s; letter-spacing: 4px; font-style: italic; width: 350px;
-            border-left: 0px solid var(--cyan);
+            border-left: 0px solid var(--cyan); text-align: left;
         }
         .menu-btn:hover { color: #fff; text-shadow: 0 0 15px #fff; transform: translateX(20px); }
-        .menu-btn.active { color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan); border-left: 6px solid var(--cyan); background: linear-gradient(90deg, rgba(0,242,255,0.1), transparent); }
+        .menu-btn.active { 
+            color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan); 
+            border-left: 6px solid var(--cyan); 
+            background: linear-gradient(90deg, rgba(0,242,255,0.15), transparent); 
+        }
     </style>
 </head>
 <body>
@@ -51,6 +62,9 @@
 </div>
 
 <script>
+/**
+ * THE CORE ENGINE
+ */
 const Engine = {
     canvas: document.getElementById('mainCanvas'),
     ctx: document.getElementById('mainCanvas').getContext('2d'),
@@ -68,92 +82,114 @@ const Engine = {
     }
 };
 
+/**
+ * MENU SYSTEM MODULE
+ */
 const MenuSystem = {
     stars: [],
     init() {
         for(let i=0; i<200; i++) {
-            this.stars.push({ x: Math.random()*800, y: Math.random()*600, s: Math.random()*2, b: Math.random()*10, v: Math.random()*0.3+0.05 });
+            this.stars.push({ 
+                x: Math.random()*800, 
+                y: Math.random()*600, 
+                s: Math.random()*2, 
+                b: Math.random()*10, 
+                v: Math.random()*0.3+0.05 
+            });
         }
     },
     draw(ctx) {
+        // Space Background
         ctx.fillStyle = "#010105";
         ctx.fillRect(0,0,800,600);
 
-        // 1. Draw Space Dust (Background)
+        // 1. Draw Star Field with Ship Occlusion
         ctx.fillStyle = "#fff";
         this.stars.forEach(s => {
             s.y -= s.v; if(s.y < 0) s.y = 600;
+            
+            // OCCLUSION: Don't render stars where the massive ship sits
+            if (s.x > 260 && s.x < 580 && s.y > 230 && s.y < 310) return;
+
             const alpha = 0.1 + Math.abs(Math.sin(s.b + Engine.frame * 0.015)) * 0.6;
             ctx.globalAlpha = alpha;
             ctx.fillRect(s.x, s.y, s.s, s.s);
         });
         ctx.globalAlpha = 1.0;
 
-        // 2. Draw Capital Ship (Foreground)
-        this.drawBattlecruiser(ctx);
+        // 2. Draw the Dreadnought
+        this.drawDreadnought(ctx);
     },
-    drawBattlecruiser(ctx) {
-        const bob = Math.sin(Engine.frame * 0.02) * 5; // Subtle engine vibration
+    drawDreadnought(ctx) {
+        const bob = Math.sin(Engine.frame * 0.02) * 4; // Slow heavy drift
         ctx.save();
-        ctx.translate(400, 240 + bob);
-        ctx.rotate(-Math.PI / 18); // Frigate-style slant
+        ctx.translate(400, 260 + bob);
 
-        // ENGINE BLOOM (The "Frigate Burn")
-        const engineGlow = ctx.createRadialGradient(0, 100, 0, 0, 100, 120);
-        engineGlow.addColorStop(0, "rgba(255, 100, 0, 0.3)"); // Orange/Amber thrust
+        // ENGINE BACKWASH (High-intensity plume)
+        const engineGlow = ctx.createLinearGradient(0, 0, -200, 0);
+        engineGlow.addColorStop(0, "rgba(0, 242, 255, 0.4)");
         engineGlow.addColorStop(1, "transparent");
         ctx.fillStyle = engineGlow;
-        ctx.fillRect(-150, 0, 300, 200);
+        ctx.fillRect(-160, 45, 160, 30); 
 
-        // SHIP HULL - TURIAN/SC STYLE (Long Spine)
-        ctx.fillStyle = "#1f2937"; // Steel Grey
-        ctx.strokeStyle = "#374151";
+        // SHIP HULL - MASSIVE PROFILE
+        ctx.fillStyle = "#111827"; // Heavy Steel Hull
+        ctx.strokeStyle = "rgba(255,255,255,0.15)";
         ctx.lineWidth = 1.5;
         
         ctx.beginPath();
-        // Forward Hammerhead Prow
-        ctx.moveTo(-30, -120); ctx.lineTo(30, -120); 
-        ctx.lineTo(40, -100); ctx.lineTo(15, -80);
-        // Slender Spine (Neck)
-        ctx.lineTo(15, -20);
-        // Lateral Broadside Fins (Wings)
-        ctx.lineTo(80, 10); ctx.lineTo(80, 40); ctx.lineTo(30, 30);
-        // Aft Engine Block (Tiered)
-        ctx.lineTo(40, 80); ctx.lineTo(-40, 80);
-        // Back up left side
-        ctx.lineTo(-30, 30); ctx.lineTo(-80, 40); ctx.lineTo(-80, 10);
-        ctx.lineTo(-15, -20); ctx.lineTo(-15, -80); ctx.lineTo(-40, -100);
+        // Hammerhead Prow (Front)
+        ctx.moveTo(180, 25);      
+        ctx.lineTo(180, 65);      
+        ctx.lineTo(140, 75);      
+        ctx.lineTo(120, 55);      
+        // Spine (Neck)
+        ctx.lineTo(-20, 55);      
+        // Aft Section (Engines)
+        ctx.lineTo(-60, 85);      
+        ctx.lineTo(-150, 85);     
+        ctx.lineTo(-150, 5);      
+        ctx.lineTo(-60, 5);       
+        // Top Profile
+        ctx.lineTo(-20, 35);      
+        ctx.lineTo(120, 35);      
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // DECK LIGHTS (Tiny Windows / Portholes)
-        ctx.fillStyle = "rgba(0, 242, 255, 0.8)";
-        for(let i=0; i<5; i++) {
-            ctx.fillRect(-2, -70 + (i*15), 4, 2); // Spine lights
+        // ARMOR PLATING DETAIL
+        ctx.strokeStyle = "rgba(255,255,255,0.05)";
+        for(let i=0; i<7; i++) {
+            ctx.strokeRect(-20 + (i*24), 35, 2, 20); // Hull Ribs
         }
 
-        // HANGAR BAY / CORE GLOW
+        // NEON STRIPS & COMMAND BRIDGE
         ctx.shadowBlur = 15;
-        ctx.shadowColor = "cyan";
-        ctx.fillStyle = "rgba(0, 242, 255, 0.5)";
-        ctx.fillRect(-10, 20, 20, 30); // Central Core
+        ctx.shadowColor = "#00f2ff";
+        ctx.fillStyle = "#00f2ff";
+        ctx.fillRect(155, 40, 15, 2);   // Sensor Strip
+        ctx.fillRect(-100, 55, 40, 3);  // Reactor Glow
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(145, 38, 5, 3);    // Command Window
 
-        // SIDE TURRET LIGHTS (Orange)
-        ctx.shadowColor = "orange";
-        ctx.fillStyle = "orange";
-        ctx.fillRect(-70, 15, 6, 3); // Left Wing Weapon
-        ctx.fillRect(64, 15, 6, 3);  // Right Wing Weapon
+        // LATERAL RCS THRUSTERS (Random Flickering)
+        if (Math.random() > 0.95) {
+            ctx.fillStyle = "cyan";
+            ctx.fillRect(130, 30, 2, 4); // Forward burst
+            ctx.fillRect(-40, 85, 2, 6); // Aft burst
+        }
 
         ctx.restore();
     }
 };
 
+// UI BUTTON LISTENERS
 document.querySelectorAll('.menu-btn').forEach(btn => {
     btn.addEventListener('mouseenter', () => btn.classList.add('active'));
     btn.addEventListener('mouseleave', () => btn.classList.remove('active'));
 });
 
+// START THE ENGINE
 Engine.init();
 </script>
 </body>
