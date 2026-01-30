@@ -7,7 +7,7 @@
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <style>
         :root { --glow: #fff; --bg: #020205; }
-        body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
         
         #game-wrapper { position: relative; width: 800px; height: 600px; border: 2px solid #333; overflow: hidden; background: #000; box-shadow: 0 0 100px #000; }
         canvas { position: absolute; top: 0; left: 0; }
@@ -19,8 +19,7 @@
         }
 
         .ui-layer { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; color: white; transition: opacity 0.8s ease;}
-        .hidden { opacity: 0; pointer-events: none; }
-
+        
         .menu-btn { 
             background: none; border: none; color: rgba(255,255,255,0.6); font-size: 22px; padding: 12px; cursor: pointer; 
             font-family: 'IBM Plex Mono', monospace; transition: 0.4s; letter-spacing: 3px; font-style: italic;
@@ -29,7 +28,7 @@
         .menu-btn.active { color: #fff; text-shadow: 0 0 20px #fff; }
 
         #main-title {
-            font-family: 'Cinzel Decorative', serif; font-size: 52px; letter-spacing: 12px; margin-top: -20px;
+            font-family: 'Cinzel Decorative', serif; font-size: 52px; letter-spacing: 12px; margin-top: 20px;
             text-shadow: 0 0 20px rgba(255,255,255,0.5), 0 2px 4px #000;
         }
     </style>
@@ -41,12 +40,8 @@
     <canvas id="mainCanvas"></canvas>
 
     <div id="menu-layer" class="ui-layer">
-        <div id="title-container" style="display: flex; flex-direction: column; align-items: center; margin-bottom: 60px;">
-            <!-- Crest is now drawn on the main canvas for better integration -->
-            <h1 id="main-title">PROJECT ALPHA</h1>
-        </div>
-        
-        <div id="menu-options">
+        <h1 id="main-title">PROJECT ALPHA</h1>
+        <div id="menu-options" style="margin-top: 40px;">
             <button class="menu-btn" data-action="new-game">START JOURNEY</button>
             <button class="menu-btn" data-action="settings">OPTIONS</button>
             <button class="menu-btn" data-action="exit">EXIT</button>
@@ -55,118 +50,122 @@
 </div>
 
 <script>
+/**
+ * THE CORE ENGINE
+ */
 const Engine = {
     canvas: document.getElementById('mainCanvas'),
     ctx: document.getElementById('mainCanvas').getContext('2d'),
     width: 800, height: 600, state: 'MENU', frame: 0,
+    
     init() {
-        this.canvas.width = this.width; this.canvas.height = this.height;
+        this.canvas.width = this.width;
+        this.canvas.height = this.height;
         MenuSystem.init();
         this.loop();
     },
+    
     loop() {
         this.frame++;
         this.ctx.clearRect(0, 0, this.width, this.height);
-        if(this.state === 'MENU') MenuSystem.update(this.ctx);
+        
+        // Modular Rendering
+        if(this.state === 'MENU') {
+            MenuSystem.drawBackground(this.ctx);
+            MenuSystem.drawCrest(this.ctx);
+        }
+        
         requestAnimationFrame(() => this.loop());
     }
 };
 
+/**
+ * MENU SYSTEM MODULE
+ */
 const MenuSystem = {
     stars: [],
     nebulas: [],
 
     init() {
-        // Create 150 unique stars
+        // Build Procedural Space
         for(let i=0; i<150; i++) {
             this.stars.push({
                 x: Math.random() * 800,
                 y: Math.random() * 600,
                 size: Math.random() * 2,
-                blink: Math.random() * Math.PI,
-                speed: Math.random() * 0.2 + 0.05
+                blink: Math.random() * 5,
+                v: Math.random() * 0.2 + 0.05
             });
         }
-        // Create 3 nebula clouds
         this.nebulas = [
-            { x: 200, y: 200, color: 'rgba(50, 0, 150, 0.2)', size: 300 },
-            { x: 600, y: 400, color: 'rgba(150, 0, 50, 0.15)', size: 400 },
-            { x: 400, y: 300, color: 'rgba(0, 100, 150, 0.1)', size: 500 }
+            { x: 200, y: 200, color: 'rgba(50, 0, 150, 0.1)', r: 300 },
+            { x: 600, y: 400, color: 'rgba(150, 0, 50, 0.1)', r: 350 }
         ];
     },
 
-    update(ctx) {
-        // 1. Space Gradient
-        const bgGrad = ctx.createLinearGradient(0, 0, 0, 600);
-        bgGrad.addColorStop(0, '#020208');
-        bgGrad.addColorStop(1, '#0a0a1a');
-        ctx.fillStyle = bgGrad;
+    drawBackground(ctx) {
+        // Deep Space Gradient
+        ctx.fillStyle = "#020208";
         ctx.fillRect(0,0,800,600);
 
-        // 2. Draw Nebulas
+        // Draw Nebulas (Gradients)
         this.nebulas.forEach(n => {
-            const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.size);
+            const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
             g.addColorStop(0, n.color);
             g.addColorStop(1, 'transparent');
             ctx.fillStyle = g;
             ctx.fillRect(0,0,800,600);
         });
 
-        // 3. Draw Twinkling Stars
+        // Twinkling Embers
         ctx.fillStyle = "#fff";
         this.stars.forEach(s => {
-            s.y -= s.speed; // Subtle parallax drift
-            if(s.y < 0) s.y = 600;
-            
+            s.y -= s.v; if(s.y < 0) s.y = 600;
             const alpha = 0.3 + Math.abs(Math.sin(s.blink + Engine.frame * 0.02)) * 0.7;
             ctx.globalAlpha = alpha;
             ctx.fillRect(s.x, s.y, s.size, s.size);
         });
         ctx.globalAlpha = 1.0;
-
-        // 4. Draw the Sword/Shield Crest behind title
-        this.drawCrest(ctx);
     },
 
     drawCrest(ctx) {
-        const centerX = 400;
-        const centerY = 240;
-        
         ctx.save();
-        ctx.translate(centerX, centerY);
+        ctx.translate(400, 260); // Center of the crest
         
-        // Glow
-        ctx.shadowBlur = 30;
-        ctx.shadowColor = "rgba(255,255,255,0.3)";
+        // Shield Glow
+        ctx.shadowBlur = 40;
+        ctx.shadowColor = "rgba(255,255,255,0.2)";
         
-        // Shield Shape
-        ctx.fillStyle = "rgba(255,255,255,0.05)";
-        ctx.strokeStyle = "rgba(255,255,255,0.2)";
+        // Simple 16-bit Shield Outline
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(0, -60); // Top
-        ctx.quadraticCurveTo(50, -50, 60, 0); // Right side
-        ctx.quadraticCurveTo(55, 60, 0, 90); // Bottom tip
-        ctx.quadraticCurveTo(-55, 60, -60, 0); // Left side
-        ctx.quadraticCurveTo(-50, -50, 0, -60);
-        ctx.fill();
+        ctx.moveTo(0, -80);
+        ctx.lineTo(60, -60);
+        ctx.lineTo(60, 20);
+        ctx.lineTo(0, 80);
+        ctx.lineTo(-60, 20);
+        ctx.lineTo(-60, -60);
+        ctx.closePath();
         ctx.stroke();
 
-        // Sword (Simplified Italic silhouette)
-        ctx.rotate(-Math.PI / 4); // Slanted like Fire Emblem logo
-        ctx.fillStyle = "rgba(255,255,255,0.4)";
-        ctx.fillRect(-2, -80, 4, 160); // Blade
-        ctx.fillRect(-15, 40, 30, 4); // Guard
+        // The Sword (Octopath Italic Slash)
+        ctx.rotate(-Math.PI / 6);
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.fillRect(-2, -100, 4, 200); // Blade
+        ctx.fillRect(-15, 60, 30, 4);   // Guard
         
         ctx.restore();
     }
 };
 
+// UI Handling
 document.querySelectorAll('.menu-btn').forEach(btn => {
     btn.addEventListener('mouseenter', () => btn.classList.add('active'));
     btn.addEventListener('mouseleave', () => btn.classList.remove('active'));
 });
 
+// Fire the Engine
 Engine.init();
 </script>
 </body>
