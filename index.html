@@ -3,28 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Alpha | Dreadnought Command</title>
+    <title>2D-HD RPG | Dreadnought Panning</title>
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <style>
         :root { --cyan: #00f2ff; --bg: #010103; }
         body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
-        
         #game-wrapper { position: relative; width: 800px; height: 600px; border: 2px solid #333; overflow: hidden; background: #000; box-shadow: 0 0 100px #000; }
         
-        /* LAYERING: Canvas (Ship) is behind the UI-Layer (Title) */
+        /* Ship Canvas is behind UI */
         canvas { position: absolute; top: 0; left: 0; z-index: 10; image-rendering: pixelated; }
         
         .ui-layer { 
             position: absolute; width: 100%; height: 100%; 
             display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            z-index: 50; /* Higher than canvas */
-            color: white; pointer-events: none; 
+            z-index: 50; color: white; pointer-events: none; 
         }
 
         #main-title {
             font-family: 'Cinzel Decorative', serif; font-size: 54px; letter-spacing: 12px; margin: 0;
             color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan);
-            animation: titlePulse 4s ease-in-out infinite;
         }
 
         .menu-options { margin-top: 100px; pointer-events: all; }
@@ -37,24 +34,20 @@
         .menu-btn.active { color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan); border-left: 6px solid var(--cyan); background: linear-gradient(90deg, rgba(0,242,255,0.1), transparent); }
 
         #crt-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%); background-size: 100% 3px; pointer-events: none; z-index: 100; }
-        
-        @keyframes titlePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
     </style>
 </head>
 <body>
 
-<div id="shake-wrapper">
-    <div id="game-wrapper">
-        <div id="crt-overlay"></div>
-        <canvas id="mainCanvas"></canvas>
-        
-        <div id="menu-layer" class="ui-layer">
-            <h1 id="main-title">PROJECT ALPHA</h1>
-            <div class="menu-options">
-                <button class="menu-btn" data-action="new-game">INITIALIZE MISSION</button>
-                <button class="menu-btn" data-action="settings">SYSTEM CONFIG</button>
-                <button class="menu-btn" data-action="exit">TERMINATE</button>
-            </div>
+<div id="game-wrapper">
+    <div id="crt-overlay"></div>
+    <canvas id="mainCanvas"></canvas>
+    
+    <div id="menu-layer" class="ui-layer">
+        <h1 id="main-title">PROJECT ALPHA</h1>
+        <div class="menu-options">
+            <button class="menu-btn" data-action="new-game">INITIALIZE MISSION</button>
+            <button class="menu-btn" data-action="settings">SYSTEM CONFIG</button>
+            <button class="menu-btn" data-action="exit">TERMINATE</button>
         </div>
     </div>
 </div>
@@ -79,48 +72,51 @@ const Engine = {
 
 const MenuSystem = {
     shipImg: new Image(),
-    loaded: false,
+    imgLoaded: false,
     stars: [],
+    shipX: 0, // Current scroll position
 
     init() {
-        // !!! Ensure 'ship.png' is in your folder !!!
         this.shipImg.src = 'ship.png'; 
-        this.shipImg.onload = () => { this.loaded = true; };
+        this.shipImg.onload = () => { this.imgLoaded = true; };
         
-        for(let i=0; i<200; i++) {
-            this.stars.push({ x: Math.random()*800, y: Math.random()*600, s: Math.random()*2, v: Math.random()*0.2+0.05 });
+        for(let i=0; i<150; i++) {
+            this.stars.push({ x: Math.random()*800, y: Math.random()*600, s: Math.random()*2, v: Math.random()*0.3 });
         }
     },
 
     draw(ctx) {
-        // Space Background
+        // 1. Space
         ctx.fillStyle = "#010105";
-        ctx.fillRect(0,0,800,600);
+        ctx.fillRect(0, 0, 800, 600);
 
-        // 1. Stars (Deepest layer)
+        // 2. Parallax Stars
         ctx.fillStyle = "#fff";
         this.stars.forEach(s => {
             s.y -= s.v; if(s.y < 0) s.y = 600;
-            ctx.globalAlpha = 0.2 + Math.random()*0.4;
+            ctx.globalAlpha = 0.3;
             ctx.fillRect(s.x, s.y, s.s, s.s);
         });
         ctx.globalAlpha = 1.0;
 
-        // 2. Draw 4X Scale Ship (Middle layer)
-        if(this.loaded) {
-            const bob = Math.sin(Engine.frame * 0.01) * 10;
-            const shipW = 2400; // 4x Larger than 600
-            const shipH = 800;  // 4x Larger than 200
-            
-            ctx.save();
-            // Center it horizontally, but let it drift slightly
-            ctx.drawImage(
-                this.shipImg, 
-                400 - (shipW / 2), // Horizontal center
-                150 - (shipH / 4) + bob, // Positioned behind the title height
-                shipW, shipH
-            );
-            ctx.restore();
+        // 3. The 4X Massive Dreadnought
+        const shipW = 3200; // 4x width of game screen
+        const shipH = 800;
+        
+        // Pan the ship slowly across the screen
+        this.shipX -= 0.5;
+        if (this.shipX < -shipW) this.shipX = 800;
+
+        const bob = Math.sin(Engine.frame * 0.01) * 15;
+
+        if (this.imgLoaded) {
+            ctx.drawImage(this.shipImg, this.shipX, 100 + bob, shipW, shipH);
+        } else {
+            // Placeholder: A massive gray bar so you know the ship is working
+            ctx.fillStyle = "rgba(50, 50, 50, 0.8)";
+            ctx.fillRect(this.shipX, 200 + bob, shipW, 200);
+            ctx.fillStyle = "#fff";
+            ctx.fillText("LOADING DREADNOUGHT ASSET...", this.shipX + 100, 300);
         }
     }
 };
