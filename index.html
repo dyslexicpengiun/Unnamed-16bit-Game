@@ -3,198 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>16-bit RPG | HD Gallery & Stats</title>
+    <title>2D-HD RPG | Project Alpha</title>
     <style>
-        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
-        #shake-wrapper { position: relative; width: 800px; height: 600px; }
-        #game-container { position: relative; width: 100%; height: 100%; border: 2px solid #333; overflow: hidden; background: #000; }
+        :root { --glow: #fff; --bg: #050505; }
+        body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
+        
+        #game-wrapper { position: relative; width: 800px; height: 600px; border: 2px solid #222; overflow: hidden; box-shadow: 0 0 50px #000; }
         canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
-        
-        /* The main container for overlays */
-        .ui-overlay { 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            z-index: 50; 
-            color: white; 
-            background: rgba(0,0,0,0.95); /* Deep dark for Start Screen */
-            transition: background 0.5s ease, opacity 0.5s ease; 
+
+        /* CRT Scanline Overlay */
+        #crt-overlay { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 3px 100%; pointer-events: none; z-index: 100; 
         }
 
-        /* Transparent class for when we are in Character Select */
-        .ui-overlay.clear { background: rgba(0,0,0,0); } 
-        
-        .hidden { display: none !important; }
-        
-        .menu-title { font-size: 50px; text-shadow: 0 0 20px #fff; margin-bottom: 40px; pointer-events: all;}
-        .btn { background: none; border: 2px solid white; color: white; padding: 15px 40px; font-size: 20px; cursor: pointer; transition: 0.3s; pointer-events: all;}
-        .btn:hover { background: white; color: black; box-shadow: 0 0 20px #fff; }
-
-        /* Stats Panel - Shape of Dreams Style */
-        #stats-panel { 
-            position: absolute; 
-            right: 40px; 
-            top: 180px; 
-            width: 220px; 
-            background: rgba(0,0,0,0.4); 
-            padding: 20px; 
-            border-left: 2px solid rgba(255,255,255,0.2); 
-            pointer-events: none; 
-            opacity: 0; 
-            transition: opacity 0.5s, transform 0.5s;
-            transform: translateX(20px);
-            z-index: 60;
+        /* Modular UI Layers */
+        .ui-layer { 
+            position: absolute; width: 100%; height: 100%; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            z-index: 50; color: white; transition: opacity 0.6s ease;
         }
-        #stats-panel.visible { opacity: 1; transform: translateX(0); }
+        .hidden { opacity: 0; pointer-events: none; }
 
-        .stat-bar { margin-bottom: 15px; }
-        .stat-label { font-size: 12px; margin-bottom: 6px; letter-spacing: 2px; opacity: 0.7; }
-        .bar-container { background: rgba(255,255,255,0.1); height: 4px; width: 100%; }
-        .bar-fill { height: 100%; width: 0%; transition: width 0.6s cubic-bezier(0.17, 0.67, 0.83, 0.67); }
+        /* Menu Styling */
+        .menu-btn { 
+            background: none; border: none; color: rgba(255,255,255,0.5); 
+            font-size: 24px; padding: 10px; cursor: pointer; font-family: inherit;
+            transition: 0.3s; letter-spacing: 3px;
+        }
+        .menu-btn:hover { color: #fff; text-shadow: 0 0 10px #fff; transform: scale(1.1); }
+        .menu-btn.active { color: #fff; text-shadow: 0 0 15px #fff; }
     </style>
 </head>
 <body>
 
-<div id="shake-wrapper">
-    <div id="game-container">
-        <!-- Background/Gallery Layer -->
-        <canvas id="uiCanvas"></canvas>
+<div id="game-wrapper">
+    <div id="crt-overlay"></div>
+    <canvas id="mainCanvas"></canvas>
 
-        <!-- Main UI State Layer -->
-        <div id="main-overlay" class="ui-overlay">
-            
-            <!-- START SCREEN CONTENT -->
-            <div id="start-content">
-                <h1 class="menu-title">UNNAMED RPG</h1>
-                <button class="btn" onclick="showCharacterSelect()">PRESS START</button>
-            </div>
-
-            <!-- CHARACTER SELECT CONTENT -->
-            <div id="char-content" class="hidden" style="text-align: center;">
-                <h2 id="hero-name" style="font-size: 40px; letter-spacing: 10px; margin-top: 320px;"></h2>
-                <p id="hero-bio" style="font-style: italic; opacity: 0.5;"></p>
-            </div>
-
+    <!-- MAIN MENU LAYER -->
+    <div id="menu-layer" class="ui-layer">
+        <h1 style="font-size: 50px; letter-spacing: 15px; margin-bottom: 60px; text-shadow: 0 0 20px rgba(255,255,255,0.5);">PROJECT ALPHA</h1>
+        <div id="menu-options" style="display:flex; flex-direction:column; gap: 15px;">
+            <button class="menu-btn active" data-action="new-game">START JOURNEY</button>
+            <button class="menu-btn" data-action="settings">OPTIONS</button>
+            <button class="menu-btn" data-action="exit">EXIT</button>
         </div>
-
-        <!-- Floating Stats Panel -->
-        <div id="stats-panel">
-            <div class="stat-bar">
-                <div class="stat-label">VITALITY</div>
-                <div class="bar-container"><div class="bar-fill" id="hp-fill" style="background: #fff; box-shadow: 0 0 10px #fff;"></div></div>
-            </div>
-            <div class="stat-bar">
-                <div class="stat-label">POWER</div>
-                <div class="bar-container"><div class="bar-fill" id="atk-fill" style="background: #fff; box-shadow: 0 0 10px #fff;"></div></div>
-            </div>
-            <div class="stat-bar">
-                <div class="stat-label">AGILITY</div>
-                <div class="bar-container"><div class="bar-fill" id="def-fill" style="background: #fff; box-shadow: 0 0 10px #fff;"></div></div>
-            </div>
-        </div>
-
     </div>
 </div>
 
 <script>
-    const uiCanvas = document.getElementById('uiCanvas');
-    const uiCtx = uiCanvas.getContext('2d');
-    const WIDTH = 800, HEIGHT = 600;
-    uiCanvas.width = WIDTH; uiCanvas.height = HEIGHT;
+/**
+ * CORE ENGINE MODULE
+ */
+const Engine = {
+    canvas: document.getElementById('mainCanvas'),
+    ctx: document.getElementById('mainCanvas').getContext('2d'),
+    width: 800,
+    height: 600,
+    state: 'MENU', // MENU, CHAR_SELECT, WORLD, BATTLE
+    frame: 0,
 
-    let gameState = "MENU";
-    let frame = 0;
-    let targetRotation = 0;
-    let currentRotation = 0;
-    let selectedIndex = 0;
+    init() {
+        this.canvas.width = this.width;
+        this.canvas.height = this.height;
+        this.loop();
+    },
 
-    const heroes = [
-        { name: "WARRIOR", color: "#ffccaa", bio: "IRON AND BLOOD", stats: { hp: 90, atk: 60, def: 40 } },
-        { name: "MAGE", color: "#aaccff", bio: "VOID WHISPERER", stats: { hp: 40, atk: 95, def: 30 } },
-        { name: "ROGUE", color: "#ccffaa", bio: "SILENT END", stats: { hp: 55, atk: 80, def: 90 } },
-        { name: "PALADIN", color: "#ffeeaa", bio: "ETERNAL LIGHT", stats: { hp: 80, atk: 50, def: 85 } }
-    ];
+    loop() {
+        this.frame++;
+        this.ctx.clearRect(0, 0, this.width, this.height);
 
-    function showCharacterSelect() {
-        gameState = "CHAR_SELECT";
-        // 1. Hide start text
-        document.getElementById('start-content').classList.add('hidden');
-        // 2. Show character text & stats
-        document.getElementById('char-content').classList.remove('hidden');
-        document.getElementById('stats-panel').classList.add('visible');
-        // 3. REMOVE the dark filter from the overlay
-        document.getElementById('main-overlay').classList.add('clear');
-        
-        updateStats(heroes[0].stats);
-    }
-
-    function updateStats(stats) {
-        document.getElementById('hp-fill').style.width = stats.hp + "%";
-        document.getElementById('atk-fill').style.width = stats.atk + "%";
-        document.getElementById('def-fill').style.width = stats.def + "%";
-    }
-
-    function drawGallery() {
-        uiCtx.clearRect(0, 0, WIDTH, HEIGHT);
-        uiCtx.fillStyle = "#050505";
-        uiCtx.fillRect(0,0,WIDTH,HEIGHT);
-
-        currentRotation += (targetRotation - currentRotation) * 0.1;
-
-        const sorted = heroes.map((h, i) => {
-            const angle = (i * (Math.PI * 2 / heroes.length)) + currentRotation;
-            return { ...h, angle, z: Math.cos(angle), index: i };
-        }).sort((a, b) => a.z - b.z);
-
-        sorted.forEach(hero => {
-            const x = WIDTH/2 + Math.sin(hero.angle) * 260;
-            const y = HEIGHT/2 + hero.z * 50;
-            const scale = (hero.z + 3) / 3;
-            const size = 64 * scale;
-
-            if (hero.z > 0.98 && selectedIndex !== hero.index) {
-                selectedIndex = hero.index;
-                document.getElementById('hero-name').innerText = hero.name;
-                document.getElementById('hero-bio').innerText = hero.bio;
-                updateStats(hero.stats);
-            }
-
-            uiCtx.globalAlpha = Math.max(0.1, (hero.z + 1) / 2);
-            uiCtx.fillStyle = hero.color;
-            if (hero.z > 0.9) {
-                uiCtx.shadowBlur = 20;
-                uiCtx.shadowColor = hero.color;
-            } else {
-                uiCtx.shadowBlur = 0;
-            }
-            
-            const bob = Math.sin(frame * 0.1) * 5;
-            uiCtx.fillRect(x - size/2, y - size/2 + bob, size, size);
-        });
-        uiCtx.shadowBlur = 0;
-        uiCtx.globalAlpha = 1;
-    }
-
-    function mainLoop() {
-        frame++;
-        if (gameState === "CHAR_SELECT") drawGallery();
-        requestAnimationFrame(mainLoop);
-    }
-
-    window.addEventListener('keydown', (e) => {
-        if (gameState === "CHAR_SELECT") {
-            if (e.key === "ArrowLeft") targetRotation += (Math.PI * 2 / heroes.length);
-            if (e.key === "ArrowRight") targetRotation -= (Math.PI * 2 / heroes.length);
+        switch(this.state) {
+            case 'MENU': MenuSystem.draw(this.ctx); break;
+            case 'CHAR_SELECT': GallerySystem.draw(this.ctx); break;
         }
-    });
 
-    mainLoop();
+        requestAnimationFrame(() => this.loop());
+    }
+};
+
+/**
+ * MENU SYSTEM MODULE
+ */
+const MenuSystem = {
+    particles: Array.from({length: 30}, () => ({
+        x: Math.random() * 800,
+        y: Math.random() * 600,
+        s: Math.random() * 2 + 1,
+        v: Math.random() * 0.5 + 0.2
+    })),
+
+    draw(ctx) {
+        // Background - Dark subtle gradient
+        const grad = ctx.createRadialGradient(400, 300, 0, 400, 300, 500);
+        grad.addColorStop(0, '#0a0a0a');
+        grad.addColorStop(1, '#000');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 800, 600);
+
+        // Floating "Dust" Particles
+        ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+        this.particles.forEach(p => {
+            p.y -= p.v;
+            if (p.y < 0) p.y = 600;
+            ctx.fillRect(p.x, p.y, p.s, p.s);
+        });
+    },
+
+    handleInput(action) {
+        if (action === 'new-game') {
+            document.getElementById('menu-layer').classList.add('hidden');
+            Engine.state = 'CHAR_SELECT';
+            // We will build GallerySystem next!
+        }
+    }
+};
+
+/**
+ * INPUT LISTENERS
+ */
+document.querySelectorAll('.menu-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        MenuSystem.handleInput(e.target.dataset.action);
+    });
+});
+
+// Boot the engine
+Engine.init();
+
 </script>
 </body>
 </html>
