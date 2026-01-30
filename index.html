@@ -3,68 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>16-bit RPG | Rotating Gallery</title>
+    <title>16-bit RPG | Kinetic Gallery</title>
     <style>
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
         #shake-wrapper { position: relative; width: 800px; height: 600px; }
         #game-container { position: relative; width: 100%; height: 100%; border: 2px solid #333; overflow: hidden; background: #000; }
         canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
         
-        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; color: white; background: rgba(0,0,0,0.9); }
+        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; color: white; background: rgba(0,0,0,0.9); pointer-events: none;}
         .hidden { display: none; }
         
-        .menu-title { font-size: 50px; text-shadow: 0 0 20px #fff; margin-bottom: 40px; }
-        .btn { background: none; border: 2px solid white; color: white; padding: 15px 40px; font-size: 20px; cursor: pointer; transition: 0.3s; }
+        .menu-title { font-size: 50px; text-shadow: 0 0 20px #fff; margin-bottom: 40px; pointer-events: all;}
+        .btn { background: none; border: 2px solid white; color: white; padding: 15px 40px; font-size: 20px; cursor: pointer; transition: 0.3s; pointer-events: all;}
         .btn:hover { background: white; color: black; box-shadow: 0 0 20px #fff; }
+
+        /* HUD Text Animations */
+        #hero-name { font-size: 38px; letter-spacing: 8px; margin-top: 360px; transition: transform 0.1s ease-out; }
+        .jolt-text { transform: scale(1.1); color: #fff; }
     </style>
 </head>
 <body>
 
 <div id="shake-wrapper">
     <div id="game-container">
-        <div id="flash"></div>
-        
-        <!-- START SCREEN -->
+        <!-- Gallery Layer -->
+        <canvas id="uiCanvas"></canvas>
+
+        <!-- UI Overlay -->
         <div id="start-screen" class="ui-overlay">
             <h1 class="menu-title">UNNAMED RPG</h1>
             <button class="btn" onclick="showCharacterSelect()">PRESS START</button>
         </div>
 
-        <!-- CHARACTER SELECT OVERLAY (Just for text) -->
-        <div id="char-select-ui" class="ui-overlay hidden" style="background: transparent; pointer-events: none;">
-            <h2 id="hero-name" style="margin-top: 350px; font-size: 32px; letter-spacing: 5px;"></h2>
-            <p id="hero-bio" style="opacity: 0.6;"></p>
-            <p style="margin-top: 50px; font-size: 12px; opacity: 0.4;">[LEFT/RIGHT] TO ROTATE | [ENTER] TO SELECT</p>
+        <div id="char-select-ui" class="ui-overlay hidden">
+            <h2 id="hero-name"></h2>
+            <p id="hero-bio" style="opacity: 0.6; letter-spacing: 2px;"></p>
+            <p style="margin-top: 40px; font-size: 10px; opacity: 0.3;">[LEFT/RIGHT] TO SPIN | [ENTER] TO EMBARK</p>
         </div>
-
-        <canvas id="battleCanvas"></canvas>
-        <canvas id="worldCanvas"></canvas>
-        <canvas id="uiCanvas"></canvas>
     </div>
 </div>
 
 <script>
     const uiCanvas = document.getElementById('uiCanvas');
     const uiCtx = uiCanvas.getContext('2d');
-    const worldCanvas = document.getElementById('worldCanvas');
-    const worldCtx = worldCanvas.getContext('2d');
-    const battleCanvas = document.getElementById('battleCanvas');
-    const battleCtx = battleCanvas.getContext('2d');
-
-    const WIDTH = 800; const HEIGHT = 600;
-    [uiCanvas, worldCanvas, battleCanvas].forEach(c => { c.width = WIDTH; c.height = HEIGHT; });
+    const WIDTH = 800, HEIGHT = 600;
+    uiCanvas.width = WIDTH; uiCanvas.height = HEIGHT;
 
     let gameState = "MENU";
     let frame = 0;
     let targetRotation = 0;
     let currentRotation = 0;
-    let selectedIndex = 0;
+    let galleryZoom = 1.0; // For the Zoom Jolt
+    let chromaticOffset = 0; // For the color kick
 
     const heroes = [
-        { name: "WARRIOR", color: "#ffccaa", bio: "UNSTOPPABLE MIGHT" },
-        { name: "MAGE", color: "#aaccff", bio: "ARCANE DOMINANCE" },
-        { name: "ROGUE", color: "#ccffaa", bio: "DEADLY PRECISION" },
-        { name: "PALADIN", color: "#ffeeaa", bio: "DIVINE PROTECTION" }
+        { name: "WARRIOR", color: "#ffccaa", bio: "IRON AND BLOOD" },
+        { name: "MAGE", color: "#aaccff", bio: "VOID WHISPERER" },
+        { name: "ROGUE", color: "#ccffaa", bio: "SILENT END" },
+        { name: "PALADIN", color: "#ffeeaa", bio: "ETERNAL LIGHT" }
     ];
 
     function showCharacterSelect() {
@@ -75,45 +71,44 @@
 
     function drawGallery() {
         uiCtx.clearRect(0, 0, WIDTH, HEIGHT);
-        
-        // 1. Solid Background
         uiCtx.fillStyle = "#050505";
         uiCtx.fillRect(0,0,WIDTH,HEIGHT);
 
-        // 2. Spotlight Floor
-        const floorGrad = uiCtx.createRadialGradient(WIDTH/2, HEIGHT/2 + 100, 20, WIDTH/2, HEIGHT/2 + 100, 400);
-        floorGrad.addColorStop(0, "rgba(50, 50, 50, 0.5)");
+        // 1. Decay the Jolt Effects
+        currentRotation += (targetRotation - currentRotation) * 0.15;
+        galleryZoom += (1.0 - galleryZoom) * 0.1;
+        chromaticOffset *= 0.8;
+
+        // Apply Global Zoom Jolt
+        uiCtx.save();
+        uiCtx.translate(WIDTH/2, HEIGHT/2);
+        uiCtx.scale(galleryZoom, galleryZoom);
+        uiCtx.translate(-WIDTH/2, -HEIGHT/2);
+
+        // 2. Draw Floor Shadow
+        const floorGrad = uiCtx.createRadialGradient(WIDTH/2, HEIGHT/2 + 100, 10, WIDTH/2, HEIGHT/2 + 100, 300);
+        floorGrad.addColorStop(0, "rgba(255, 255, 255, 0.05)");
         floorGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
         uiCtx.fillStyle = floorGrad;
         uiCtx.fillRect(0,0,WIDTH,HEIGHT);
 
-        // 3. Smooth Rotation Math
-        currentRotation += (targetRotation - currentRotation) * 0.1;
-
-        // 4. Sort heroes by "Z" so the ones in back are drawn first
-        const sortedHeroes = heroes.map((h, i) => {
+        // 3. Z-Sorted Hero Render
+        const sorted = heroes.map((h, i) => {
             const angle = (i * (Math.PI * 2 / heroes.length)) + currentRotation;
             return { ...h, angle, z: Math.cos(angle) };
         }).sort((a, b) => a.z - b.z);
 
-        sortedHeroes.forEach(hero => {
-            const x = WIDTH/2 + Math.sin(hero.angle) * 280;
-            const y = HEIGHT/2 + hero.z * 60; // The "flat" ellipse look
-            const scale = (hero.z + 2.5) / 2.5; // Scale from front to back
-            const size = 60 * scale;
-            const alpha = (hero.z + 1.2) / 2.2;
-
-            uiCtx.globalAlpha = Math.max(0.1, alpha);
+        sorted.forEach(hero => {
+            const x = WIDTH/2 + Math.sin(hero.angle) * 260;
+            const y = HEIGHT/2 + hero.z * 60;
+            const scale = (hero.z + 3) / 3;
+            const size = 64 * scale;
             
-            // Character Shadow
-            uiCtx.fillStyle = "rgba(0,0,0,0.5)";
-            uiCtx.beginPath();
-            uiCtx.ellipse(x, y + size/2, 20 * scale, 5 * scale, 0, 0, Math.PI*2);
-            uiCtx.fill();
+            uiCtx.globalAlpha = Math.max(0.1, (hero.z + 1.2) / 2.2);
 
-            // Character Glow (Only for the one in front)
-            if (hero.z > 0.9) {
-                uiCtx.shadowBlur = 30;
+            // Spotlight Logic
+            if (hero.z > 0.95) {
+                uiCtx.shadowBlur = 25 * galleryZoom;
                 uiCtx.shadowColor = hero.color;
                 document.getElementById('hero-name').innerText = hero.name;
                 document.getElementById('hero-bio').innerText = hero.bio;
@@ -121,35 +116,50 @@
                 uiCtx.shadowBlur = 0;
             }
 
-            // Character Sprite
+            // Draw with Chromatic Kick
+            const bob = Math.sin(frame * 0.1) * 4;
+            const squash = 1 + (Math.abs(targetRotation - currentRotation) * 0.2); // Squashes while moving
+
+            // Red Channel Offset
+            uiCtx.fillStyle = "rgba(255,0,0,0.5)";
+            uiCtx.fillRect(x - size/2 + chromaticOffset, y - size/2 + bob, size * squash, size / squash);
+            
+            // Blue Channel Offset
+            uiCtx.fillStyle = "rgba(0,0,255,0.5)";
+            uiCtx.fillRect(x - size/2 - chromaticOffset, y - size/2 + bob, size * squash, size / squash);
+
+            // Main Color
             uiCtx.fillStyle = hero.color;
-            const bob = Math.sin(frame * 0.1) * 5 * scale;
-            uiCtx.fillRect(x - size/2, y - size/2 + bob, size, size);
+            uiCtx.fillRect(x - size/2, y - size/2 + bob, size * squash, size / squash);
         });
 
+        uiCtx.restore();
         uiCtx.shadowBlur = 0;
         uiCtx.globalAlpha = 1;
     }
 
     function mainLoop() {
         frame++;
-        if (gameState === "CHAR_SELECT") {
-            drawGallery();
-        }
+        if (gameState === "CHAR_SELECT") drawGallery();
         requestAnimationFrame(mainLoop);
     }
 
     window.addEventListener('keydown', (e) => {
         if (gameState === "CHAR_SELECT") {
+            const move = (Math.PI * 2 / heroes.length);
             if (e.key === "ArrowLeft") {
-                targetRotation += (Math.PI * 2 / heroes.length);
+                targetRotation += move;
+                galleryZoom = 1.08; // Jolt In
+                chromaticOffset = 15; // Kick Colors
             }
             if (e.key === "ArrowRight") {
-                targetRotation -= (Math.PI * 2 / heroes.length);
+                targetRotation -= move;
+                galleryZoom = 1.08; 
+                chromaticOffset = -15;
             }
             if (e.key === "Enter") {
-                console.log("Hero Selected!");
-                // Add your startGame logic here
+                // Future transition to gameplay
+                console.log("Embarking!");
             }
         }
     });
