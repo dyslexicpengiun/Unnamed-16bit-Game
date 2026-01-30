@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D-HD RPG | Main Menu</title>
+    <title>2D-HD RPG | Main Menu (Visual Test)</title>
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <style>
         :root { --glow: #fff; --bg: #050505; }
@@ -12,37 +12,23 @@
         #game-wrapper { position: relative; width: 800px; height: 600px; border: 2px solid #222; overflow: hidden; box-shadow: 0 0 50px #000; }
         canvas { position: absolute; top: 0; left: 0; }
 
-        /* CRT Scanline Overlay */
         #crt-overlay { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
             background-size: 100% 3px, 3px 100%; pointer-events: none; z-index: 100; 
         }
 
-        /* Modular UI Layers */
-        .ui-layer { 
-            position: absolute; width: 100%; height: 100%; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            z-index: 50; color: white; transition: opacity 0.6s ease;
-        }
+        .ui-layer { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; color: white; transition: opacity 0.6s ease;}
         .hidden { opacity: 0; pointer-events: none; }
 
-        /* Fancy Octopath/FE Text Style */
         .menu-btn { 
-            background: none; border: none; color: rgba(255,255,255,0.7); 
-            font-size: 24px; padding: 10px; cursor: pointer; 
-            font-family: 'IBM Plex Mono', monospace; /* Modern Mono font for crisp look */
-            transition: 0.3s; letter-spacing: 2px; font-style: italic;
+            background: none; border: none; color: rgba(255,255,255,0.7); font-size: 24px; padding: 10px; cursor: pointer; 
+            font-family: 'IBM Plex Mono', monospace; transition: 0.3s; letter-spacing: 2px; font-style: italic;
         }
         .menu-btn:hover { color: #fff; text-shadow: 0 0 10px #fff; transform: scale(1.05); }
-        .menu-btn.active { color: #fff; text-shadow: 0 0 15px #fff; }
 
-        /* Main Title Style (Cinzel is an elegant serif like those games use) */
         #main-title {
-            font-family: 'Cinzel Decorative', serif;
-            font-size: 50px;
-            letter-spacing: 8px;
-            margin-bottom: 20px;
+            font-family: 'Cinzel Decorative', serif; font-size: 50px; letter-spacing: 8px; margin-bottom: 20px;
             text-shadow: 0 0 15px rgba(255,255,255,0.7), 0 2px 0 #000;
         }
     </style>
@@ -56,7 +42,6 @@
     <!-- MAIN MENU LAYER -->
     <div id="menu-layer" class="ui-layer">
         <div id="title-container" style="text-align: center; margin-bottom: 60px;">
-            <!-- Placeholder for Sword/Shield Crest Canvas Drawing -->
             <canvas id="crestCanvas" width="150" height="150"></canvas>
             <h1 id="main-title">PROJECT ALPHA</h1>
         </div>
@@ -71,72 +56,64 @@
 
 <script>
 /**
- * CORE ENGINE MODULE (Modularized Main Controller)
+ * CORE ENGINE MODULE
  */
 const Engine = {
     canvas: document.getElementById('mainCanvas'),
     ctx: document.getElementById('mainCanvas').getContext('2d'),
     width: 800, height: 600, state: 'MENU', frame: 0,
     init() {
-        this.canvas.width = this.width;
-        this.canvas.height = this.height;
-        MenuSystem.drawCrest(); // Draw the high-detail crest once
+        this.canvas.width = this.width; this.canvas.height = this.height;
+        MenuSystem.loadAssets(); 
+        MenuSystem.drawCrest(); 
         this.loop();
     },
     loop() {
-        this.frame++;
-        this.ctx.clearRect(0, 0, this.width, this.height);
-        switch(this.state) {
-            case 'MENU': MenuSystem.draw(this.ctx); break;
-        }
+        this.frame++; this.ctx.clearRect(0, 0, this.width, this.height);
+        switch(this.state) { case 'MENU': MenuSystem.draw(this.ctx); break; }
         requestAnimationFrame(() => this.loop());
     }
 };
 
 /**
- * MENU SYSTEM MODULE (Handles all menu visuals and logic)
+ * MENU SYSTEM MODULE
  */
 const MenuSystem = {
-    particles: Array.from({length: 40}, () => ({
-        x: Math.random() * 800, y: Math.random() * 600, s: Math.random() * 2 + 1, v: Math.random() * 0.5 + 0.2
-    })),
+    backgroundImage: null,
+    particles: Array.from({length: 40}, () => ({ x: Math.random() * 800, y: Math.random() * 600, s: Math.random() * 2 + 1, v: Math.random() * 0.5 + 0.2 })),
+
+    loadAssets() {
+        this.backgroundImage = new Image();
+        // Public domain, direct linkable space pixel art image from RawPixel (via Wikimedia Commons)
+        this.backgroundImage.src = 'https://upload.wikimedia.org'; 
+        this.backgroundImage.onload = () => console.log("Background loaded!");
+        this.backgroundImage.onerror = () => console.error("Background failed to load. Check the URL or internet connection!");
+    },
 
     draw(ctx) {
-        // High-end radial background for HD feel
-        const grad = ctx.createRadialGradient(400, 300, 0, 400, 300, 500);
-        grad.addColorStop(0, '#1a1a1a');
-        grad.addColorStop(1, '#000');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 800, 600);
+        if (this.backgroundImage && this.backgroundImage.complete) {
+            // Draw background image, scaled to fill
+            ctx.drawImage(this.backgroundImage, 0, 0, Engine.width, Engine.height);
+        } else {
+            // Fallback gradient
+            const grad = ctx.createRadialGradient(400, 300, 0, 400, 300, 500); grad.addColorStop(0, '#1a1a1a'); grad.addColorStop(1, '#000');
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, 800, 600);
+        }
+        
+        // Add subtle vignette on top of image
+        ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(0,0,800,600);
 
-        // Floating "Dust" Particles
+        // Floating "Dust" Particles (Parallax)
         ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
-        this.particles.forEach(p => {
-            p.y -= p.v;
-            if (p.y < 0) p.y = 600;
-            ctx.fillRect(p.x, p.y, p.s, p.s);
-        });
+        this.particles.forEach(p => { p.y -= p.v; if (p.y < 0) p.y = 600; ctx.fillRect(p.x, p.y, p.s, p.s); });
     },
 
     drawCrest() {
         const c_ctx = document.getElementById('crestCanvas').getContext('2d');
         const size = 150;
-        // This is where you would load a custom pixel art image
-        // For now, a high-def canvas drawing simulates the look
-        c_ctx.fillStyle = '#aaa';
-        c_ctx.beginPath();
-        c_ctx.moveTo(size/2, 10);
-        c_ctx.lineTo(size-20, size/2);
-        c_ctx.lineTo(size/2, size-10);
-        c_ctx.lineTo(20, size/2);
-        c_ctx.closePath();
-        c_ctx.shadowColor = '#fff';
-        c_ctx.shadowBlur = 10;
-        c_ctx.fill();
-        c_ctx.fillStyle = '#333';
-        c_ctx.font = '30px serif';
-        c_ctx.textAlign = 'center';
-        c_ctx.fillText('A', size/2, size/2 + 10);
+        c_ctx.fillStyle = '#aaa'; c_ctx.beginPath(); c_ctx.moveTo(size/2, 10); c_ctx.lineTo(size-20, size/2); c_ctx.lineTo(size/2, size-10); c_ctx.lineTo(20, size/2); c_ctx.closePath();
+        c_ctx.shadowColor = '#fff'; c_ctx.shadowBlur = 10; c_ctx.fill(); c_ctx.fillStyle = '#333';
+        c_ctx.font = '30px serif'; c_ctx.textAlign = 'center'; c_ctx.fillText('A', size/2, size/2 + 10);
         c_ctx.shadowBlur = 0;
     },
     
@@ -144,7 +121,6 @@ const MenuSystem = {
         if (action === 'new-game') {
             document.getElementById('menu-layer').classList.add('hidden');
             Engine.state = 'CHAR_SELECT';
-            // We will build GallerySystem next!
         }
     }
 };
