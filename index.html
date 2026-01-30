@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>16-bit 2D-HD: Cinematic Impact</title>
+    <title>16-bit 2D-HD: Fixed Shake</title>
     <style>
         body { margin: 0; background: #020202; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         
-        /* SHAKE WRAPPER */
-        #shake-container { position: relative; width: 800px; height: 600px; transition: transform 0.05s linear; }
+        /* The wrapper that actually shakes - No CSS transitions here! */
+        #shake-wrapper { position: relative; width: 800px; height: 600px; }
         
         #game-container { 
             position: relative; width: 100%; height: 100%; border: 2px solid #333; 
-            overflow: hidden; background: #000; box-shadow: 0 0 100px rgba(0,0,0,0.9); 
+            overflow: hidden; background: #000; box-shadow: 0 0 80px rgba(0,0,0,1); 
         }
         canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
         #flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; pointer-events: none; z-index: 100; }
@@ -20,7 +20,7 @@
 </head>
 <body>
 
-<div id="shake-container">
+<div id="shake-wrapper">
     <div id="game-container">
         <div id="flash"></div>
         <canvas id="battleCanvas"></canvas>
@@ -34,7 +34,7 @@
     const battleCanvas = document.getElementById('battleCanvas');
     const battleCtx = battleCanvas.getContext('2d');
     const flashEl = document.getElementById('flash');
-    const shakeEl = document.getElementById('shake-container');
+    const shakeWrapper = document.getElementById('shake-wrapper');
 
     const WIDTH = 800; const HEIGHT = 600;
     worldCanvas.width = battleCanvas.width = WIDTH;
@@ -42,73 +42,67 @@
 
     let frame = 0;
     let transitionActive = false;
-    let shakeIntensity = 0; // Current power of the shake
+    let shakePower = 0; 
 
-    // --- HD ASSETS ---
     const townNPCs = [{ x: 220, y: 440, color: '#ffccaa' }, { x: 520, y: 410, color: '#aaccff' }];
-    const particles = Array.from({ length: 45 }, () => ({ x: Math.random() * WIDTH, y: Math.random() * HEIGHT, v: Math.random() * 1.5 + 0.5 }));
+    const particles = Array.from({ length: 40 }, () => ({ x: Math.random() * WIDTH, y: Math.random() * HEIGHT, v: Math.random() * 1.5 + 0.5 }));
 
     function drawScene(ctx, type) {
         ctx.clearRect(0, 0, WIDTH, HEIGHT);
         ctx.fillStyle = type === 'town' ? '#3e8948' : '#121212';
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
         
-        // Character Rendering with Motion Blur
         const chars = type === 'town' ? townNPCs : [{ x: 380, y: 270, color: '#ff3333' }];
         chars.forEach(c => {
-            for (let i = 2; i >= 0; i--) {
-                const ghostBob = Math.sin((frame - (i * 3)) * 0.15) * 6;
-                ctx.globalAlpha = i === 0 ? 1.0 : 0.2;
-                if (i === 0) {
-                    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-                    ctx.beginPath(); ctx.ellipse(c.x + 20, c.y + 45, 18, 6, 0, 0, Math.PI * 2); ctx.fill();
-                }
-                ctx.fillStyle = c.color;
-                ctx.fillRect(c.x, c.y + ghostBob, 40, 45);
-            }
+            const bob = Math.sin(frame * 0.15) * 6;
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath(); ctx.ellipse(c.x + 20, c.y + 45, 18, 6, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = c.color;
+            ctx.fillRect(c.x, c.y + bob, 40, 45);
         });
-        ctx.globalAlpha = 1.0;
 
-        // UI Layer
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-        ctx.fillRect(40, 20, 720, 65);
+        // Embers
+        ctx.fillStyle = type === 'town' ? 'rgba(255,255,255,0.3)' : 'rgba(255,100,50,0.6)';
+        particles.forEach(p => { p.y -= p.v; if (p.y < 0) p.y = HEIGHT; ctx.fillRect(p.x, p.y, 2, 2); });
+
+        // UI
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(40, 20, 720, 60);
         ctx.strokeStyle = type === 'town' ? '#fff' : '#ff4400';
-        ctx.strokeRect(45, 25, 710, 55);
+        ctx.strokeRect(45, 25, 710, 50);
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 16px monospace';
-        ctx.fillText(type === 'town' ? "> TOWN: [B] TO START BATTLE" : "> COMBAT INITIATED", 70, 58);
+        ctx.fillText(type === 'town' ? "> PEACEFUL TOWN [B] TO BATTLE" : "> COMBAT MODE ACTIVE", 70, 55);
     }
 
-    // --- MAIN LOOP ---
     function mainLoop() {
         frame++;
         drawScene(battleCtx, 'battle'); 
 
-        // Apply Decaying Shake
-        if (shakeIntensity > 0) {
-            const sx = (Math.random() - 0.5) * shakeIntensity;
-            const sy = (Math.random() - 0.5) * shakeIntensity;
-            shakeEl.style.transform = `translate(${sx}px, ${sy}px)`;
-            shakeIntensity *= 0.92; // Rapid decay
-            if (shakeIntensity < 0.5) shakeIntensity = 0;
+        // --- FIXED SHAKE LOGIC ---
+        if (shakePower > 0.1) {
+            const x = (Math.random() - 0.5) * shakePower;
+            const y = (Math.random() - 0.5) * shakePower;
+            shakeWrapper.style.transform = `translate(${x}px, ${y}px)`;
+            shakePower *= 0.90; // Decay the shake power
         } else {
-            shakeEl.style.transform = `translate(0,0)`;
+            shakeWrapper.style.transform = `translate(0,0)`;
         }
 
         if (!transitionActive) {
             drawScene(worldCtx, 'town'); 
         } else {
-            // Chromatic Drip
             const stripWidth = 4;
             const columns = Math.ceil(WIDTH / stripWidth) + 60;
             for (let i = 0; i < columns; i++) {
                 if (drops[i] < HEIGHT) {
                     const xCurrent = ((i * stripWidth) - 150) + (drops[i] / 2.5);
                     
+                    // Chromatic Drip
                     worldCtx.globalCompositeOperation = 'screen';
                     worldCtx.globalAlpha = 0.4;
-                    worldCtx.drawImage(battleCanvas, xCurrent + 2, drops[i], stripWidth, 12, xCurrent + 2, drops[i], stripWidth, 12);
-                    worldCtx.drawImage(battleCanvas, xCurrent - 2, drops[i], stripWidth, 12, xCurrent - 2, drops[i], stripWidth, 12);
+                    worldCtx.drawImage(battleCanvas, xCurrent + 3, drops[i], stripWidth, 12, xCurrent + 3, drops[i], stripWidth, 12);
+                    worldCtx.drawImage(battleCanvas, xCurrent - 3, drops[i], stripWidth, 12, xCurrent - 3, drops[i], stripWidth, 12);
                     
                     worldCtx.globalCompositeOperation = 'source-over';
                     worldCtx.globalAlpha = 1.0;
@@ -121,18 +115,18 @@
         requestAnimationFrame(mainLoop);
     }
 
-    // --- TRIGGER ---
     const drops = new Array(Math.ceil(WIDTH / 4) + 60).fill(0);
     let speeds = [];
 
     window.addEventListener('keydown', (e) => {
         if (e.key.toLowerCase() === 'b' && !transitionActive) {
-            // Flash + Shake
+            // Flash
             flashEl.style.transition = "none";
             flashEl.style.opacity = "1";
-            setTimeout(() => { flashEl.style.transition = "opacity 1.2s ease-out"; flashEl.style.opacity = "0"; }, 40);
+            setTimeout(() => { flashEl.style.transition = "opacity 0.8s ease-out"; flashEl.style.opacity = "0"; }, 50);
             
-            shakeIntensity = 15; // Starting power of the jolt
+            // Trigger Shake
+            shakePower = 18; 
             
             drops.fill(0);
             speeds = Array.from({ length: drops.length }, () => Math.random() * 10 + 7);
