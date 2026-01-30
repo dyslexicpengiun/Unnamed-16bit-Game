@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>16-bit 2D-HD Game Template | Reset Enabled</title>
+    <title>16-bit 2D-HD | Fixed Logic & Reset</title>
     <style>
         body { margin: 0; background: #050505; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         #shake-wrapper { position: relative; width: 800px; height: 600px; }
@@ -36,6 +36,7 @@
 
     let frame = 0;
     let transitionActive = false;
+    let inBattle = false; // Track the current scene state
     let shakePower = 0;
 
     // ENTITIES
@@ -83,30 +84,45 @@
         frame++;
         drawScene(battleCtx, 'battle'); 
 
+        // Shake Logic
         if (shakePower > 0.1) {
             const x = (Math.random() - 0.5) * shakePower;
             const y = (Math.random() - 0.5) * shakePower;
             shakeWrapper.style.transform = `translate(${x}px, ${y}px)`;
             shakePower *= 0.91;
-        } else { shakeWrapper.style.transform = `translate(0,0)`; }
+        } else { 
+            shakeWrapper.style.transform = `translate(0,0)`; 
+        }
 
         if (!transitionActive) {
-            drawScene(worldCtx, 'town'); 
+            // Render either town or battle based on scene state
+            drawScene(worldCtx, inBattle ? 'battle' : 'town'); 
         } else {
             const stripWidth = 4;
             const columns = Math.ceil(WIDTH / stripWidth) + 65;
+            let finished = true;
+
             for (let i = 0; i < columns; i++) {
-                if (drops[i] < HEIGHT) {
+                if (drops[i] < HEIGHT + 100) {
+                    finished = false; // Transition still running
                     const xCurrent = ((i * stripWidth) - 150) + (drops[i] / 3);
+                    
                     worldCtx.globalCompositeOperation = 'screen';
                     worldCtx.globalAlpha = 0.5;
                     worldCtx.drawImage(battleCanvas, xCurrent + 3, drops[i], stripWidth, 15, xCurrent + 3, drops[i], stripWidth, 15);
                     worldCtx.drawImage(battleCanvas, xCurrent - 3, drops[i], stripWidth, 15, xCurrent - 3, drops[i], stripWidth, 15);
+                    
                     worldCtx.globalCompositeOperation = 'source-over';
                     worldCtx.globalAlpha = 1.0;
                     worldCtx.drawImage(battleCanvas, xCurrent, drops[i], stripWidth, 15, xCurrent, drops[i], stripWidth, 15);
+                    
                     drops[i] += speeds[i];
                 }
+            }
+
+            if (finished) {
+                transitionActive = false;
+                inBattle = true; // Switch context to battle
             }
         }
         requestAnimationFrame(mainLoop);
@@ -117,7 +133,9 @@
 
     window.addEventListener('keydown', (e) => {
         const key = e.key.toLowerCase();
-        if (key === 'b' && !transitionActive) {
+        
+        // START BATTLE
+        if (key === 'b' && !transitionActive && !inBattle) {
             flashEl.style.transition = "none";
             flashEl.style.opacity = "1";
             setTimeout(() => { flashEl.style.transition = "opacity 1.5s ease-out"; flashEl.style.opacity = "0"; }, 50);
@@ -126,11 +144,14 @@
             speeds = Array.from({ length: drops.length }, () => Math.random() * 11 + 7);
             transitionActive = true;
         }
-        // RESET LOGIC
+
+        // RESET
         if (key === 'r') {
             transitionActive = false;
+            inBattle = false; // Reset to town
+            drops.fill(0); // Clear transition state
             worldCtx.clearRect(0,0,WIDTH,HEIGHT);
-            console.log("System Reset: Returned to Town");
+            console.log("Returned to Town");
         }
     });
 
