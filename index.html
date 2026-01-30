@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D-HD RPG | Project Alpha</title>
+    <title>2D-HD RPG | Main Menu</title>
+    <link href="https://fonts.googleapis.com" rel="stylesheet">
     <style>
         :root { --glow: #fff; --bg: #050505; }
-        body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
+        body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         
         #game-wrapper { position: relative; width: 800px; height: 600px; border: 2px solid #222; overflow: hidden; box-shadow: 0 0 50px #000; }
-        canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
+        canvas { position: absolute; top: 0; left: 0; }
 
         /* CRT Scanline Overlay */
         #crt-overlay { 
@@ -26,14 +27,24 @@
         }
         .hidden { opacity: 0; pointer-events: none; }
 
-        /* Menu Styling */
+        /* Fancy Octopath/FE Text Style */
         .menu-btn { 
-            background: none; border: none; color: rgba(255,255,255,0.5); 
-            font-size: 24px; padding: 10px; cursor: pointer; font-family: inherit;
-            transition: 0.3s; letter-spacing: 3px;
+            background: none; border: none; color: rgba(255,255,255,0.7); 
+            font-size: 24px; padding: 10px; cursor: pointer; 
+            font-family: 'IBM Plex Mono', monospace; /* Modern Mono font for crisp look */
+            transition: 0.3s; letter-spacing: 2px; font-style: italic;
         }
-        .menu-btn:hover { color: #fff; text-shadow: 0 0 10px #fff; transform: scale(1.1); }
+        .menu-btn:hover { color: #fff; text-shadow: 0 0 10px #fff; transform: scale(1.05); }
         .menu-btn.active { color: #fff; text-shadow: 0 0 15px #fff; }
+
+        /* Main Title Style (Cinzel is an elegant serif like those games use) */
+        #main-title {
+            font-family: 'Cinzel Decorative', serif;
+            font-size: 50px;
+            letter-spacing: 8px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 15px rgba(255,255,255,0.7), 0 2px 0 #000;
+        }
     </style>
 </head>
 <body>
@@ -44,7 +55,12 @@
 
     <!-- MAIN MENU LAYER -->
     <div id="menu-layer" class="ui-layer">
-        <h1 style="font-size: 50px; letter-spacing: 15px; margin-bottom: 60px; text-shadow: 0 0 20px rgba(255,255,255,0.5);">PROJECT ALPHA</h1>
+        <div id="title-container" style="text-align: center; margin-bottom: 60px;">
+            <!-- Placeholder for Sword/Shield Crest Canvas Drawing -->
+            <canvas id="crestCanvas" width="150" height="150"></canvas>
+            <h1 id="main-title">PROJECT ALPHA</h1>
+        </div>
+        
         <div id="menu-options" style="display:flex; flex-direction:column; gap: 15px;">
             <button class="menu-btn active" data-action="new-game">START JOURNEY</button>
             <button class="menu-btn" data-action="settings">OPTIONS</button>
@@ -55,56 +71,46 @@
 
 <script>
 /**
- * CORE ENGINE MODULE
+ * CORE ENGINE MODULE (Modularized Main Controller)
  */
 const Engine = {
     canvas: document.getElementById('mainCanvas'),
     ctx: document.getElementById('mainCanvas').getContext('2d'),
-    width: 800,
-    height: 600,
-    state: 'MENU', // MENU, CHAR_SELECT, WORLD, BATTLE
-    frame: 0,
-
+    width: 800, height: 600, state: 'MENU', frame: 0,
     init() {
         this.canvas.width = this.width;
         this.canvas.height = this.height;
+        MenuSystem.drawCrest(); // Draw the high-detail crest once
         this.loop();
     },
-
     loop() {
         this.frame++;
         this.ctx.clearRect(0, 0, this.width, this.height);
-
         switch(this.state) {
             case 'MENU': MenuSystem.draw(this.ctx); break;
-            case 'CHAR_SELECT': GallerySystem.draw(this.ctx); break;
         }
-
         requestAnimationFrame(() => this.loop());
     }
 };
 
 /**
- * MENU SYSTEM MODULE
+ * MENU SYSTEM MODULE (Handles all menu visuals and logic)
  */
 const MenuSystem = {
-    particles: Array.from({length: 30}, () => ({
-        x: Math.random() * 800,
-        y: Math.random() * 600,
-        s: Math.random() * 2 + 1,
-        v: Math.random() * 0.5 + 0.2
+    particles: Array.from({length: 40}, () => ({
+        x: Math.random() * 800, y: Math.random() * 600, s: Math.random() * 2 + 1, v: Math.random() * 0.5 + 0.2
     })),
 
     draw(ctx) {
-        // Background - Dark subtle gradient
+        // High-end radial background for HD feel
         const grad = ctx.createRadialGradient(400, 300, 0, 400, 300, 500);
-        grad.addColorStop(0, '#0a0a0a');
+        grad.addColorStop(0, '#1a1a1a');
         grad.addColorStop(1, '#000');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, 800, 600);
 
         // Floating "Dust" Particles
-        ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+        ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
         this.particles.forEach(p => {
             p.y -= p.v;
             if (p.y < 0) p.y = 600;
@@ -112,6 +118,28 @@ const MenuSystem = {
         });
     },
 
+    drawCrest() {
+        const c_ctx = document.getElementById('crestCanvas').getContext('2d');
+        const size = 150;
+        // This is where you would load a custom pixel art image
+        // For now, a high-def canvas drawing simulates the look
+        c_ctx.fillStyle = '#aaa';
+        c_ctx.beginPath();
+        c_ctx.moveTo(size/2, 10);
+        c_ctx.lineTo(size-20, size/2);
+        c_ctx.lineTo(size/2, size-10);
+        c_ctx.lineTo(20, size/2);
+        c_ctx.closePath();
+        c_ctx.shadowColor = '#fff';
+        c_ctx.shadowBlur = 10;
+        c_ctx.fill();
+        c_ctx.fillStyle = '#333';
+        c_ctx.font = '30px serif';
+        c_ctx.textAlign = 'center';
+        c_ctx.fillText('A', size/2, size/2 + 10);
+        c_ctx.shadowBlur = 0;
+    },
+    
     handleInput(action) {
         if (action === 'new-game') {
             document.getElementById('menu-layer').classList.add('hidden');
@@ -132,7 +160,6 @@ document.querySelectorAll('.menu-btn').forEach(btn => {
 
 // Boot the engine
 Engine.init();
-
 </script>
 </body>
 </html>
