@@ -10,9 +10,10 @@
         body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
         
         #game-wrapper { position: relative; width: 800px; height: 600px; border: 2px solid #333; overflow: hidden; background: #000; box-shadow: 0 0 100px #000; }
+        
+        /* Ship Canvas is behind UI */
         canvas { position: absolute; top: 0; left: 0; z-index: 10; image-rendering: pixelated; }
         
-        /* FIXED UI POSITIONING */
         .ui-layer { 
             position: absolute; 
             top: 0; 
@@ -26,18 +27,17 @@
 
         #main-title {
             position: absolute;
-            top: 150px;
-            left: 50%;
-            transform: translateX(-50%);
+            top: 140px;
+            width: 100%;
+            text-align: center;
             font-family: 'Cinzel Decorative', serif; font-size: 54px; letter-spacing: 12px; margin: 0;
             color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan);
-            width: 100%; text-align: center;
         }
 
         .menu-options { 
             position: absolute;
-            top: 320px;
-            left: 100px;
+            top: 340px;
+            left: 80px;
             pointer-events: all; 
             display: flex;
             flex-direction: column;
@@ -49,7 +49,12 @@
             font-family: 'IBM Plex Mono', monospace; transition: 0.4s; letter-spacing: 4px; font-style: italic; 
             text-align: left; border-left: 0px solid var(--cyan);
         }
-        .menu-btn:hover, .menu-btn.active { color: #fff; text-shadow: 0 0 15px #fff; transform: translateX(20px); border-left: 6px solid var(--cyan); background: linear-gradient(90deg, rgba(0,242,255,0.1), transparent); }
+        .menu-btn:hover, .menu-btn.active { 
+            color: #fff; text-shadow: 0 0 15px #fff; 
+            transform: translateX(20px); 
+            border-left: 6px solid var(--cyan); 
+            background: linear-gradient(90deg, rgba(0,242,255,0.1), transparent); 
+        }
 
         #crt-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%); background-size: 100% 3px; pointer-events: none; z-index: 100; }
     </style>
@@ -59,6 +64,7 @@
 <div id="game-wrapper">
     <div id="crt-overlay"></div>
     <canvas id="mainCanvas"></canvas>
+    
     <div class="ui-layer">
         <h1 id="main-title">PROJECT ALPHA</h1>
         <div class="menu-options">
@@ -88,27 +94,21 @@ const Engine = {
 };
 
 const MenuSystem = {
-    shipImg: new Image(),
-    imgLoaded: false,
     stars: [],
-    shipX: 0,
+    shipX: 200, // Starting horizontal position
 
     init() {
-        // Force CORS to help image loading
-        this.shipImg.crossOrigin = "anonymous";
-        this.shipImg.src = 'ship.png'; 
-        this.shipImg.onload = () => { this.imgLoaded = true; };
-        
-        for(let i=0; i<100; i++) {
+        for(let i=0; i<120; i++) {
             this.stars.push({ x: Math.random()*800, y: Math.random()*600, s: Math.random()*2, v: Math.random()*0.2 });
         }
     },
 
     draw(ctx) {
+        // 1. Space
         ctx.fillStyle = "#010105";
         ctx.fillRect(0, 0, 800, 600);
 
-        // Stars
+        // 2. Stars
         ctx.fillStyle = "#fff";
         this.stars.forEach(s => {
             s.y -= s.v; if(s.y < 0) s.y = 600;
@@ -117,23 +117,65 @@ const MenuSystem = {
         });
         ctx.globalAlpha = 1.0;
 
-        // Ship logic: Limit total pixel area to avoid browser crashes
-        const shipW = 2000; 
-        const shipH = 600;
-        this.shipX -= 0.3;
-        if (this.shipX < -shipW) this.shipX = 800;
+        // 3. Move the ship
+        this.shipX -= 0.4;
+        if (this.shipX < -1500) this.shipX = 900;
 
-        const bob = Math.sin(Engine.frame * 0.005) * 10;
+        this.drawMassiveDreadnought(ctx, this.shipX, 280);
+    },
 
-        if (this.imgLoaded) {
-            ctx.drawImage(this.shipImg, this.shipX, 50 + bob, shipW, shipH);
-        } else {
-            // DEBUG BOX: Visible if ship.png is missing or broken
-            ctx.fillStyle = "rgba(40, 40, 50, 0.9)";
-            ctx.fillRect(this.shipX, 150 + bob, shipW, 300);
-            ctx.fillStyle = "white";
-            ctx.fillText("SEARCHING FOR ship.png...", this.shipX + 850, 300);
-        }
+    drawMassiveDreadnought(ctx, x, y) {
+        const bob = Math.sin(Engine.frame * 0.01) * 12;
+        ctx.save();
+        ctx.translate(x, y + bob);
+        
+        // Scale everything up to simulate the "4x" feel
+        ctx.scale(2.5, 2.5); 
+
+        // ENGINE GLOW (Visible on the far left)
+        const engineGlow = ctx.createLinearGradient(-100, 0, -300, 0);
+        engineGlow.addColorStop(0, "rgba(0, 242, 255, 0.4)");
+        engineGlow.addColorStop(1, "transparent");
+        ctx.fillStyle = engineGlow;
+        ctx.fillRect(-250, -20, 200, 60);
+
+        // HULL SILHOUETTE
+        ctx.fillStyle = "#111827";
+        ctx.strokeStyle = "rgba(255,255,255,0.15)";
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        // Massively long Battlecruiser silhouette
+        ctx.moveTo(-200, 0);    // Back top
+        ctx.lineTo(300, 0);     // Long spine top
+        ctx.lineTo(350, -20);   // Upper Prow
+        ctx.lineTo(400, 0);     // Nose Tip
+        ctx.lineTo(400, 40);    // Nose Face
+        ctx.lineTo(350, 60);    // Lower Prow
+        ctx.lineTo(300, 40);    // Under Prow
+        ctx.lineTo(-200, 40);   // Long spine bottom
+        ctx.lineTo(-220, 60);   // Lower engine block
+        ctx.lineTo(-250, 60);   // Back wall bottom
+        ctx.lineTo(-250, -20);  // Back wall top
+        ctx.lineTo(-220, -20);  // Upper engine block
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // DECK DETAILS (Glow strips)
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "cyan";
+        ctx.fillStyle = "cyan";
+        ctx.fillRect(360, 15, 30, 2); // Forward sensor
+        ctx.fillRect(-230, 10, 20, 20); // Engine Core
+
+        // AMBER WINDOWS (Command centers)
+        ctx.shadowColor = "orange";
+        ctx.fillStyle = "orange";
+        ctx.fillRect(320, 5, 10, 5); // Main Bridge
+        
+        ctx.restore();
+        ctx.shadowBlur = 0;
     }
 };
 
