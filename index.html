@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>16-bit RPG - Pixel Drip Transition</title>
+    <title>16-bit RPG - Angled Pixel Drip Transition</title>
     <style>
         body { 
             margin: 0; 
@@ -22,7 +22,6 @@
             border: 4px solid #444;
             overflow: hidden;
         }
-        /* Layering: Battle is background, World is top, Canvas handles the "melt" */
         canvas { position: absolute; top: 0; left: 0; }
         #ui {
             position: absolute;
@@ -37,7 +36,7 @@
 </head>
 <body>
 
-<div id="ui">PRESS 'B' TO START PIXEL DRIP BATTLE</div>
+<div id="ui">PRESS 'B' TO START ANGLED PIXEL DRIP BATTLE</div>
 
 <div id="game-container">
     <!-- The "Target" scene (Battle) -->
@@ -59,31 +58,36 @@
 
     // --- 1. RENDER MOCK SCENES ---
     function createScenes() {
-        // Draw Overworld (Green with "trees")
-        worldCtx.fillStyle = '#3e8948'; 
+        // Draw Town Scene
+        worldCtx.fillStyle = '#b0e0e6'; // Sky Blue
         worldCtx.fillRect(0, 0, WIDTH, HEIGHT);
-        worldCtx.fillStyle = '#2d5e2d';
-        for(let i=0; i<20; i++) worldCtx.fillRect(Math.random()*WIDTH, Math.random()*HEIGHT, 40, 40);
+        worldCtx.fillStyle = '#6b8e23'; // Ground
+        worldCtx.fillRect(0, HEIGHT - 100, WIDTH, 100);
+        worldCtx.fillStyle = '#8b4513'; // Houses
+        worldCtx.fillRect(100, HEIGHT - 200, 150, 100);
+        worldCtx.fillRect(500, HEIGHT - 180, 150, 80);
         worldCtx.fillStyle = 'white';
         worldCtx.font = 'bold 30px monospace';
-        worldCtx.fillText("--- OVERWORLD ---", 260, 300);
+        worldCtx.fillText("--- PEACEFUL TOWN ---", 250, 150);
 
-        // Draw Battle Scene (Dark with "enemies")
-        battleCtx.fillStyle = '#1a1a1a'; 
+        // Draw Battle Scene (Hidden Beneath)
+        battleCtx.fillStyle = '#444'; // Dungeon Gray
         battleCtx.fillRect(0, 0, WIDTH, HEIGHT);
-        battleCtx.fillStyle = '#7a1a1a';
-        battleCtx.fillRect(350, 200, 100, 150); // Boss
+        battleCtx.fillStyle = '#7a1a1a'; // Lava/Danger
+        battleCtx.fillRect(0, HEIGHT - 50, WIDTH, 50);
         battleCtx.fillStyle = 'red';
         battleCtx.font = 'bold 30px monospace';
-        battleCtx.fillText("--- BATTLE START ---", 250, 100);
+        battleCtx.fillText("--- BATTLE START: DUNGEON ---", 180, 100);
     }
     createScenes();
 
-    // --- 2. PIXEL DRIP LOGIC ---
-    const stripWidth = 8; // Adjust for "chunkiness"
-    const columns = Math.ceil(WIDTH / stripWidth);
-    let drops = new Array(columns).fill(0);
-    let speeds = new Array(columns).fill(0);
+    // --- 2. ANGLED PIXEL DRIP LOGIC ---
+    const stripHeight = 8; // Height of each horizontal "wind strip" in pixels
+    const rows = Math.ceil(HEIGHT / stripHeight);
+    // drops now tracks the X position of the "leading edge" of the drip for each row
+    let dropsX = new Array(rows).fill(WIDTH); 
+    const speeds = Array.from({ length: rows }, () => Math.random() * 8 + 4); 
+    const angleSpeed = 15; // How much it shifts horizontally per vertical step
     let transitionActive = false;
 
     function animateDrip() {
@@ -91,23 +95,25 @@
 
         let finished = true;
 
-        for (let i = 0; i < columns; i++) {
-            if (drops[i] < HEIGHT) {
+        for (let i = 0; i < rows; i++) {
+            const currentX = dropsX[i];
+
+            if (currentX > 0) {
                 finished = false;
                 
-                const x = i * stripWidth;
-                const currentY = drops[i];
-                const speed = speeds[i];
+                const y = i * stripHeight;
+                // Calculate how many pixels wide the "drip" should be this frame
+                const dripWidth = speeds[i] + angleSpeed; 
 
                 // Draw a slice of the battle canvas onto the world canvas
-                // This "replaces" the overworld pixels with battle pixels
                 worldCtx.drawImage(
                     battleCanvas,
-                    x, currentY, stripWidth, speed + 2, // Source slice
-                    x, currentY, stripWidth, speed + 2  // Destination position
+                    currentX - dripWidth, y, dripWidth, stripHeight, // Source slice
+                    currentX - dripWidth, y, dripWidth, stripHeight  // Destination position
                 );
 
-                drops[i] += speed;
+                // Move the starting X position of the drip to the left (wind effect)
+                dropsX[i] -= speeds[i];
             }
         }
 
@@ -116,19 +122,17 @@
         } else {
             transitionActive = false;
             console.log("Transition Complete!");
+            // Ensure the battle canvas fully covers everything when done
+            worldCtx.clearRect(0, 0, WIDTH, HEIGHT);
         }
     }
 
     // --- 3. TRIGGER ---
     window.addEventListener('keydown', (e) => {
         if (e.key.toLowerCase() === 'b' && !transitionActive) {
-            // Re-render world in case we already transitioned
-            createScenes(); 
-            
-            // Randomize speeds for this specific transition
-            drops.fill(0);
-            speeds = Array.from({ length: columns }, () => Math.random() * 8 + 4);
-            
+            createScenes(); // Reset the overworld
+            dropsX.fill(WIDTH); // Start all drips at the far right
+            speeds = Array.from({ length: rows }, () => Math.random() * 6 + 4);
             transitionActive = true;
             animateDrip();
         }
