@@ -10,54 +10,92 @@
         #game-container { position: relative; width: 100%; height: 100%; border: 2px solid #333; overflow: hidden; background: #000; }
         canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
         
-        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; color: white; background: rgba(0,0,0,0.9); pointer-events: none;}
-        .hidden { display: none; }
+        /* The main container for overlays */
+        .ui-overlay { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 50; 
+            color: white; 
+            background: rgba(0,0,0,0.95); /* Deep dark for Start Screen */
+            transition: background 0.5s ease, opacity 0.5s ease; 
+        }
+
+        /* Transparent class for when we are in Character Select */
+        .ui-overlay.clear { background: rgba(0,0,0,0); } 
+        
+        .hidden { display: none !important; }
         
         .menu-title { font-size: 50px; text-shadow: 0 0 20px #fff; margin-bottom: 40px; pointer-events: all;}
         .btn { background: none; border: 2px solid white; color: white; padding: 15px 40px; font-size: 20px; cursor: pointer; transition: 0.3s; pointer-events: all;}
         .btn:hover { background: white; color: black; box-shadow: 0 0 20px #fff; }
 
-        /* Stats Panel */
-        #stats-panel { position: absolute; right: 20px; top: 150px; width: 250px; background: rgba(255,255,255,0.05); padding: 15px; border: 1px solid rgba(255,255,255,0.2); pointer-events: none; opacity: 0; transition: opacity 0.5s;}
-        .stat-bar { margin-bottom: 10px; }
-        .stat-label { font-size: 14px; margin-bottom: 4px; opacity: 0.8; }
-        .bar-container { background: rgba(0,0,0,0.5); height: 8px; overflow: hidden; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
-        .bar-fill { height: 100%; width: 0%; transition: width 0.8s ease-out; box-shadow: 0 0 8px currentColor; }
+        /* Stats Panel - Shape of Dreams Style */
+        #stats-panel { 
+            position: absolute; 
+            right: 40px; 
+            top: 180px; 
+            width: 220px; 
+            background: rgba(0,0,0,0.4); 
+            padding: 20px; 
+            border-left: 2px solid rgba(255,255,255,0.2); 
+            pointer-events: none; 
+            opacity: 0; 
+            transition: opacity 0.5s, transform 0.5s;
+            transform: translateX(20px);
+            z-index: 60;
+        }
+        #stats-panel.visible { opacity: 1; transform: translateX(0); }
+
+        .stat-bar { margin-bottom: 15px; }
+        .stat-label { font-size: 12px; margin-bottom: 6px; letter-spacing: 2px; opacity: 0.7; }
+        .bar-container { background: rgba(255,255,255,0.1); height: 4px; width: 100%; }
+        .bar-fill { height: 100%; width: 0%; transition: width 0.6s cubic-bezier(0.17, 0.67, 0.83, 0.67); }
     </style>
 </head>
 <body>
 
 <div id="shake-wrapper">
     <div id="game-container">
-        <!-- Gallery Layer -->
+        <!-- Background/Gallery Layer -->
         <canvas id="uiCanvas"></canvas>
 
-        <!-- UI Overlay -->
-        <div id="start-screen" class="ui-overlay">
-            <h1 class="menu-title">UNNAMED RPG</h1>
-            <button class="btn" onclick="showCharacterSelect()">PRESS START</button>
+        <!-- Main UI State Layer -->
+        <div id="main-overlay" class="ui-overlay">
+            
+            <!-- START SCREEN CONTENT -->
+            <div id="start-content">
+                <h1 class="menu-title">UNNAMED RPG</h1>
+                <button class="btn" onclick="showCharacterSelect()">PRESS START</button>
+            </div>
+
+            <!-- CHARACTER SELECT CONTENT -->
+            <div id="char-content" class="hidden" style="text-align: center;">
+                <h2 id="hero-name" style="font-size: 40px; letter-spacing: 10px; margin-top: 320px;"></h2>
+                <p id="hero-bio" style="font-style: italic; opacity: 0.5;"></p>
+            </div>
+
         </div>
 
-        <div id="char-select-ui" class="ui-overlay hidden">
-            <h2 id="hero-name"></h2>
-            <p id="hero-bio" style="opacity: 0.6; letter-spacing: 2px;"></p>
-            <p style="margin-top: 40px; font-size: 10px; opacity: 0.3;">[LEFT/RIGHT] TO SPIN | [ENTER] TO EMBARK</p>
-        </div>
-
-        <!-- Stats Panel -->
+        <!-- Floating Stats Panel -->
         <div id="stats-panel">
-            <h3 style="margin-top:0; font-size: 16px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">ATTRIBUTES</h3>
             <div class="stat-bar">
-                <div class="stat-label">HEALTH</div>
-                <div class="bar-container"><div class="bar-fill" id="hp-fill" style="background-color: #28a745;"></div></div>
+                <div class="stat-label">VITALITY</div>
+                <div class="bar-container"><div class="bar-fill" id="hp-fill" style="background: #fff; box-shadow: 0 0 10px #fff;"></div></div>
             </div>
             <div class="stat-bar">
-                <div class="stat-label">ATTACK</div>
-                <div class="bar-container"><div class="bar-fill" id="atk-fill" style="background-color: #dc3545;"></div></div>
+                <div class="stat-label">POWER</div>
+                <div class="bar-container"><div class="bar-fill" id="atk-fill" style="background: #fff; box-shadow: 0 0 10px #fff;"></div></div>
             </div>
             <div class="stat-bar">
-                <div class="stat-label">DEFENSE</div>
-                <div class="bar-container"><div class="bar-fill" id="def-fill" style="background-color: #007bff;"></div></div>
+                <div class="stat-label">AGILITY</div>
+                <div class="bar-container"><div class="bar-fill" id="def-fill" style="background: #fff; box-shadow: 0 0 10px #fff;"></div></div>
             </div>
         </div>
 
@@ -74,49 +112,40 @@
     let frame = 0;
     let targetRotation = 0;
     let currentRotation = 0;
-    let galleryZoom = 1.0;
-    let chromaticOffset = 0;
+    let selectedIndex = 0;
 
     const heroes = [
-        { name: "WARRIOR", color: "#ffccaa", bio: "IRON AND BLOOD", stats: { hp: 90, atk: 70, def: 80 } },
-        { name: "MAGE", color: "#aaccff", bio: "VOID WHISPERER", stats: { hp: 60, atk: 95, def: 50 } },
-        { name: "ROGUE", color: "#ccffaa", bio: "SILENT END", stats: { hp: 70, atk: 85, def: 60 } },
-        { name: "PALADIN", color: "#ffeeaa", bio: "ETERNAL LIGHT", stats: { hp: 85, atk: 65, def: 90 } }
+        { name: "WARRIOR", color: "#ffccaa", bio: "IRON AND BLOOD", stats: { hp: 90, atk: 60, def: 40 } },
+        { name: "MAGE", color: "#aaccff", bio: "VOID WHISPERER", stats: { hp: 40, atk: 95, def: 30 } },
+        { name: "ROGUE", color: "#ccffaa", bio: "SILENT END", stats: { hp: 55, atk: 80, def: 90 } },
+        { name: "PALADIN", color: "#ffeeaa", bio: "ETERNAL LIGHT", stats: { hp: 80, atk: 50, def: 85 } }
     ];
 
     function showCharacterSelect() {
         gameState = "CHAR_SELECT";
-        document.getElementById('start-screen').classList.add('hidden');
-        document.getElementById('char-select-ui').classList.remove('hidden');
-        document.getElementById('stats-panel').style.opacity = 1;
-        updateStatsUI(heroes[0].stats); // Load default stats
+        // 1. Hide start text
+        document.getElementById('start-content').classList.add('hidden');
+        // 2. Show character text & stats
+        document.getElementById('char-content').classList.remove('hidden');
+        document.getElementById('stats-panel').classList.add('visible');
+        // 3. REMOVE the dark filter from the overlay
+        document.getElementById('main-overlay').classList.add('clear');
+        
+        updateStats(heroes[0].stats);
     }
 
-    function updateStatsUI(stats) {
-        document.getElementById('hp-fill').style.width = `${stats.hp}%`;
-        document.getElementById('atk-fill').style.width = `${stats.atk}%`;
-        document.getElementById('def-fill').style.width = `${stats.def}%`;
+    function updateStats(stats) {
+        document.getElementById('hp-fill').style.width = stats.hp + "%";
+        document.getElementById('atk-fill').style.width = stats.atk + "%";
+        document.getElementById('def-fill').style.width = stats.def + "%";
     }
-    
-    // ... (rest of mainLoop, drawGallery, and event listeners) ...
 
     function drawGallery() {
         uiCtx.clearRect(0, 0, WIDTH, HEIGHT);
         uiCtx.fillStyle = "#050505";
         uiCtx.fillRect(0,0,WIDTH,HEIGHT);
-        currentRotation += (targetRotation - currentRotation) * 0.15;
-        galleryZoom += (1.0 - galleryZoom) * 0.1;
-        chromaticOffset *= 0.8;
-        uiCtx.save();
-        uiCtx.translate(WIDTH/2, HEIGHT/2);
-        uiCtx.scale(galleryZoom, galleryZoom);
-        uiCtx.translate(-WIDTH/2, -HEIGHT/2);
 
-        const floorGrad = uiCtx.createRadialGradient(WIDTH/2, HEIGHT/2 + 100, 10, WIDTH/2, HEIGHT/2 + 100, 300);
-        floorGrad.addColorStop(0, "rgba(255, 255, 255, 0.05)");
-        floorGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
-        uiCtx.fillStyle = floorGrad;
-        uiCtx.fillRect(0,0,WIDTH,HEIGHT);
+        currentRotation += (targetRotation - currentRotation) * 0.1;
 
         const sorted = heroes.map((h, i) => {
             const angle = (i * (Math.PI * 2 / heroes.length)) + currentRotation;
@@ -125,33 +154,29 @@
 
         sorted.forEach(hero => {
             const x = WIDTH/2 + Math.sin(hero.angle) * 260;
-            const y = HEIGHT/2 + hero.z * 60;
+            const y = HEIGHT/2 + hero.z * 50;
             const scale = (hero.z + 3) / 3;
             const size = 64 * scale;
-            uiCtx.globalAlpha = Math.max(0.1, (hero.z + 1.2) / 2.2);
 
-            if (hero.z > 0.95) {
-                uiCtx.shadowBlur = 25 * galleryZoom;
-                uiCtx.shadowColor = hero.color;
+            if (hero.z > 0.98 && selectedIndex !== hero.index) {
+                selectedIndex = hero.index;
                 document.getElementById('hero-name').innerText = hero.name;
                 document.getElementById('hero-bio').innerText = hero.bio;
-                // Check if selection changed
-                if (selectedIndex !== hero.index) {
-                    selectedIndex = hero.index;
-                    updateStatsUI(hero.stats);
-                }
+                updateStats(hero.stats);
+            }
+
+            uiCtx.globalAlpha = Math.max(0.1, (hero.z + 1) / 2);
+            uiCtx.fillStyle = hero.color;
+            if (hero.z > 0.9) {
+                uiCtx.shadowBlur = 20;
+                uiCtx.shadowColor = hero.color;
             } else {
                 uiCtx.shadowBlur = 0;
             }
-
-            const bob = Math.sin(frame * 0.1) * 4;
-            const squash = 1 + (Math.abs(targetRotation - currentRotation) * 0.2);
-
-            uiCtx.fillStyle = hero.color;
-            uiCtx.fillRect(x - size/2, y - size/2 + bob, size * squash, size / squash);
+            
+            const bob = Math.sin(frame * 0.1) * 5;
+            uiCtx.fillRect(x - size/2, y - size/2 + bob, size, size);
         });
-
-        uiCtx.restore();
         uiCtx.shadowBlur = 0;
         uiCtx.globalAlpha = 1;
     }
@@ -164,21 +189,8 @@
 
     window.addEventListener('keydown', (e) => {
         if (gameState === "CHAR_SELECT") {
-            const move = (Math.PI * 2 / heroes.length);
-            if (e.key === "ArrowLeft") {
-                targetRotation += move;
-                galleryZoom = 1.08;
-                chromaticOffset = 15;
-            }
-            if (e.key === "ArrowRight") {
-                targetRotation -= move;
-                galleryZoom = 1.08;
-                chromaticOffset = -15;
-            }
-            if (e.key === "Enter") {
-                console.log(`Selected ${heroes[selectedIndex].name}!`);
-                startGame();
-            }
+            if (e.key === "ArrowLeft") targetRotation += (Math.PI * 2 / heroes.length);
+            if (e.key === "ArrowRight") targetRotation -= (Math.PI * 2 / heroes.length);
         }
     });
 
