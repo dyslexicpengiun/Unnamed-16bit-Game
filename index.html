@@ -3,13 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>16-bit 2D-HD: Fixed Shake</title>
+    <title>16-bit 2D-HD: Glowing Combat</title>
     <style>
-        body { margin: 0; background: #020202; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        
-        /* The wrapper that actually shakes - No CSS transitions here! */
+        body { margin: 0; background: #010101; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         #shake-wrapper { position: relative; width: 800px; height: 600px; }
-        
         #game-container { 
             position: relative; width: 100%; height: 100%; border: 2px solid #333; 
             overflow: hidden; background: #000; box-shadow: 0 0 80px rgba(0,0,0,1); 
@@ -42,49 +39,92 @@
 
     let frame = 0;
     let transitionActive = false;
-    let shakePower = 0; 
+    let shakePower = 0;
 
-    const townNPCs = [{ x: 220, y: 440, color: '#ffccaa' }, { x: 520, y: 410, color: '#aaccff' }];
-    const particles = Array.from({ length: 40 }, () => ({ x: Math.random() * WIDTH, y: Math.random() * HEIGHT, v: Math.random() * 1.5 + 0.5 }));
+    // --- HSL ENTITIES ---
+    // H: Hue, S: Saturation, L: Lightness
+    const townNPCs = [
+        { x: 220, y: 440, h: 30, s: 100, l: 80 }, // Villager (Peach)
+        { x: 520, y: 410, h: 210, s: 100, l: 80 } // Merchant (Blue)
+    ];
+    const boss = { x: 380, y: 270, h: 0, s: 100, l: 50 }; // Boss (Red)
+
+    const particles = Array.from({ length: 45 }, () => ({ 
+        x: Math.random() * WIDTH, 
+        y: Math.random() * HEIGHT, 
+        v: Math.random() * 1.5 + 0.5 
+    }));
 
     function drawScene(ctx, type) {
         ctx.clearRect(0, 0, WIDTH, HEIGHT);
-        ctx.fillStyle = type === 'town' ? '#3e8948' : '#121212';
+        ctx.fillStyle = type === 'town' ? '#2d5a27' : '#0d0d0d';
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
         
-        const chars = type === 'town' ? townNPCs : [{ x: 380, y: 270, color: '#ff3333' }];
+        const chars = type === 'town' ? townNPCs : [boss];
+        
         chars.forEach(c => {
             const bob = Math.sin(frame * 0.15) * 6;
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            const glowIntensity = 15 + Math.sin(frame * 0.1) * 10;
+            const pulseL = c.l + (Math.sin(frame * 0.2) * 10);
+
+            // 1. Anchored Shadow (No Glow)
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
             ctx.beginPath(); ctx.ellipse(c.x + 20, c.y + 45, 18, 6, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = c.color;
-            ctx.fillRect(c.x, c.y + bob, 40, 45);
+
+            // 2. Motion Blur + Glow
+            for (let i = 2; i >= 0; i--) {
+                const ghostBob = Math.sin((frame - (i * 3)) * 0.15) * 6;
+                ctx.globalAlpha = i === 0 ? 1.0 : 0.2;
+                
+                // Set Glow on the main sprite (i=0)
+                if (i === 0) {
+                    ctx.shadowBlur = glowIntensity;
+                    ctx.shadowColor = `hsl(${c.h}, ${c.s}%, ${pulseL}%)`;
+                } else {
+                    ctx.shadowBlur = 0;
+                }
+
+                ctx.fillStyle = `hsl(${c.h}, ${c.s}%, ${pulseL}%)`;
+                ctx.fillRect(c.x, c.y + ghostBob, 40, 45);
+            }
         });
+        
+        // Reset Glow for other elements
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1.0;
 
         // Embers
-        ctx.fillStyle = type === 'town' ? 'rgba(255,255,255,0.3)' : 'rgba(255,100,50,0.6)';
-        particles.forEach(p => { p.y -= p.v; if (p.y < 0) p.y = HEIGHT; ctx.fillRect(p.x, p.y, 2, 2); });
+        ctx.fillStyle = type === 'town' ? 'rgba(255,255,255,0.4)' : 'rgba(255,100,50,0.8)';
+        particles.forEach(p => { 
+            p.y -= p.v; if (p.y < 0) p.y = HEIGHT; 
+            ctx.fillRect(p.x, p.y, 2, 2); 
+        });
 
-        // UI
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        // UI Glow
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = type === 'town' ? '#fff' : '#f00';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
         ctx.fillRect(40, 20, 720, 60);
-        ctx.strokeStyle = type === 'town' ? '#fff' : '#ff4400';
+        ctx.strokeStyle = type === 'town' ? '#fff' : '#f00';
         ctx.strokeRect(45, 25, 710, 50);
+        ctx.shadowBlur = 0;
+
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 16px monospace';
-        ctx.fillText(type === 'town' ? "> PEACEFUL TOWN [B] TO BATTLE" : "> COMBAT MODE ACTIVE", 70, 55);
+        ctx.fillText(type === 'town' ? "> TOWN: [B] TO BATTLE" : "> BOSS FIGHT: DETECTED", 70, 55);
     }
 
     function mainLoop() {
         frame++;
         drawScene(battleCtx, 'battle'); 
 
-        // --- FIXED SHAKE LOGIC ---
+        // Shake Logic
         if (shakePower > 0.1) {
             const x = (Math.random() - 0.5) * shakePower;
             const y = (Math.random() - 0.5) * shakePower;
             shakeWrapper.style.transform = `translate(${x}px, ${y}px)`;
-            shakePower *= 0.90; // Decay the shake power
+            shakePower *= 0.92;
         } else {
             shakeWrapper.style.transform = `translate(0,0)`;
         }
@@ -101,12 +141,12 @@
                     // Chromatic Drip
                     worldCtx.globalCompositeOperation = 'screen';
                     worldCtx.globalAlpha = 0.4;
-                    worldCtx.drawImage(battleCanvas, xCurrent + 3, drops[i], stripWidth, 12, xCurrent + 3, drops[i], stripWidth, 12);
-                    worldCtx.drawImage(battleCanvas, xCurrent - 3, drops[i], stripWidth, 12, xCurrent - 3, drops[i], stripWidth, 12);
+                    worldCtx.drawImage(battleCanvas, xCurrent + 3, drops[i], stripWidth, 15, xCurrent + 3, drops[i], stripWidth, 15);
+                    worldCtx.drawImage(battleCanvas, xCurrent - 3, drops[i], stripWidth, 15, xCurrent - 3, drops[i], stripWidth, 15);
                     
                     worldCtx.globalCompositeOperation = 'source-over';
                     worldCtx.globalAlpha = 1.0;
-                    worldCtx.drawImage(battleCanvas, xCurrent, drops[i], stripWidth, 12, xCurrent, drops[i], stripWidth, 12);
+                    worldCtx.drawImage(battleCanvas, xCurrent, drops[i], stripWidth, 15, xCurrent, drops[i], stripWidth, 15);
                     
                     drops[i] += speeds[i];
                 }
@@ -120,16 +160,13 @@
 
     window.addEventListener('keydown', (e) => {
         if (e.key.toLowerCase() === 'b' && !transitionActive) {
-            // Flash
             flashEl.style.transition = "none";
             flashEl.style.opacity = "1";
-            setTimeout(() => { flashEl.style.transition = "opacity 0.8s ease-out"; flashEl.style.opacity = "0"; }, 50);
+            setTimeout(() => { flashEl.style.transition = "opacity 1.2s ease-out"; flashEl.style.opacity = "0"; }, 50);
             
-            // Trigger Shake
-            shakePower = 18; 
-            
+            shakePower = 20; 
             drops.fill(0);
-            speeds = Array.from({ length: drops.length }, () => Math.random() * 10 + 7);
+            speeds = Array.from({ length: drops.length }, () => Math.random() * 11 + 7);
             transitionActive = true;
         }
     });
