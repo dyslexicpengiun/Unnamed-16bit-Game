@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>16-bit RPG | Kinetic Gallery</title>
+    <title>16-bit RPG | HD Gallery & Stats</title>
     <style>
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
         #shake-wrapper { position: relative; width: 800px; height: 600px; }
@@ -17,9 +17,12 @@
         .btn { background: none; border: 2px solid white; color: white; padding: 15px 40px; font-size: 20px; cursor: pointer; transition: 0.3s; pointer-events: all;}
         .btn:hover { background: white; color: black; box-shadow: 0 0 20px #fff; }
 
-        /* HUD Text Animations */
-        #hero-name { font-size: 38px; letter-spacing: 8px; margin-top: 360px; transition: transform 0.1s ease-out; }
-        .jolt-text { transform: scale(1.1); color: #fff; }
+        /* Stats Panel */
+        #stats-panel { position: absolute; right: 20px; top: 150px; width: 250px; background: rgba(255,255,255,0.05); padding: 15px; border: 1px solid rgba(255,255,255,0.2); pointer-events: none; opacity: 0; transition: opacity 0.5s;}
+        .stat-bar { margin-bottom: 10px; }
+        .stat-label { font-size: 14px; margin-bottom: 4px; opacity: 0.8; }
+        .bar-container { background: rgba(0,0,0,0.5); height: 8px; overflow: hidden; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+        .bar-fill { height: 100%; width: 0%; transition: width 0.8s ease-out; box-shadow: 0 0 8px currentColor; }
     </style>
 </head>
 <body>
@@ -40,6 +43,24 @@
             <p id="hero-bio" style="opacity: 0.6; letter-spacing: 2px;"></p>
             <p style="margin-top: 40px; font-size: 10px; opacity: 0.3;">[LEFT/RIGHT] TO SPIN | [ENTER] TO EMBARK</p>
         </div>
+
+        <!-- Stats Panel -->
+        <div id="stats-panel">
+            <h3 style="margin-top:0; font-size: 16px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">ATTRIBUTES</h3>
+            <div class="stat-bar">
+                <div class="stat-label">HEALTH</div>
+                <div class="bar-container"><div class="bar-fill" id="hp-fill" style="background-color: #28a745;"></div></div>
+            </div>
+            <div class="stat-bar">
+                <div class="stat-label">ATTACK</div>
+                <div class="bar-container"><div class="bar-fill" id="atk-fill" style="background-color: #dc3545;"></div></div>
+            </div>
+            <div class="stat-bar">
+                <div class="stat-label">DEFENSE</div>
+                <div class="bar-container"><div class="bar-fill" id="def-fill" style="background-color: #007bff;"></div></div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -53,49 +74,53 @@
     let frame = 0;
     let targetRotation = 0;
     let currentRotation = 0;
-    let galleryZoom = 1.0; // For the Zoom Jolt
-    let chromaticOffset = 0; // For the color kick
+    let galleryZoom = 1.0;
+    let chromaticOffset = 0;
 
     const heroes = [
-        { name: "WARRIOR", color: "#ffccaa", bio: "IRON AND BLOOD" },
-        { name: "MAGE", color: "#aaccff", bio: "VOID WHISPERER" },
-        { name: "ROGUE", color: "#ccffaa", bio: "SILENT END" },
-        { name: "PALADIN", color: "#ffeeaa", bio: "ETERNAL LIGHT" }
+        { name: "WARRIOR", color: "#ffccaa", bio: "IRON AND BLOOD", stats: { hp: 90, atk: 70, def: 80 } },
+        { name: "MAGE", color: "#aaccff", bio: "VOID WHISPERER", stats: { hp: 60, atk: 95, def: 50 } },
+        { name: "ROGUE", color: "#ccffaa", bio: "SILENT END", stats: { hp: 70, atk: 85, def: 60 } },
+        { name: "PALADIN", color: "#ffeeaa", bio: "ETERNAL LIGHT", stats: { hp: 85, atk: 65, def: 90 } }
     ];
 
     function showCharacterSelect() {
         gameState = "CHAR_SELECT";
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('char-select-ui').classList.remove('hidden');
+        document.getElementById('stats-panel').style.opacity = 1;
+        updateStatsUI(heroes[0].stats); // Load default stats
     }
+
+    function updateStatsUI(stats) {
+        document.getElementById('hp-fill').style.width = `${stats.hp}%`;
+        document.getElementById('atk-fill').style.width = `${stats.atk}%`;
+        document.getElementById('def-fill').style.width = `${stats.def}%`;
+    }
+    
+    // ... (rest of mainLoop, drawGallery, and event listeners) ...
 
     function drawGallery() {
         uiCtx.clearRect(0, 0, WIDTH, HEIGHT);
         uiCtx.fillStyle = "#050505";
         uiCtx.fillRect(0,0,WIDTH,HEIGHT);
-
-        // 1. Decay the Jolt Effects
         currentRotation += (targetRotation - currentRotation) * 0.15;
         galleryZoom += (1.0 - galleryZoom) * 0.1;
         chromaticOffset *= 0.8;
-
-        // Apply Global Zoom Jolt
         uiCtx.save();
         uiCtx.translate(WIDTH/2, HEIGHT/2);
         uiCtx.scale(galleryZoom, galleryZoom);
         uiCtx.translate(-WIDTH/2, -HEIGHT/2);
 
-        // 2. Draw Floor Shadow
         const floorGrad = uiCtx.createRadialGradient(WIDTH/2, HEIGHT/2 + 100, 10, WIDTH/2, HEIGHT/2 + 100, 300);
         floorGrad.addColorStop(0, "rgba(255, 255, 255, 0.05)");
         floorGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
         uiCtx.fillStyle = floorGrad;
         uiCtx.fillRect(0,0,WIDTH,HEIGHT);
 
-        // 3. Z-Sorted Hero Render
         const sorted = heroes.map((h, i) => {
             const angle = (i * (Math.PI * 2 / heroes.length)) + currentRotation;
-            return { ...h, angle, z: Math.cos(angle) };
+            return { ...h, angle, z: Math.cos(angle), index: i };
         }).sort((a, b) => a.z - b.z);
 
         sorted.forEach(hero => {
@@ -103,32 +128,25 @@
             const y = HEIGHT/2 + hero.z * 60;
             const scale = (hero.z + 3) / 3;
             const size = 64 * scale;
-            
             uiCtx.globalAlpha = Math.max(0.1, (hero.z + 1.2) / 2.2);
 
-            // Spotlight Logic
             if (hero.z > 0.95) {
                 uiCtx.shadowBlur = 25 * galleryZoom;
                 uiCtx.shadowColor = hero.color;
                 document.getElementById('hero-name').innerText = hero.name;
                 document.getElementById('hero-bio').innerText = hero.bio;
+                // Check if selection changed
+                if (selectedIndex !== hero.index) {
+                    selectedIndex = hero.index;
+                    updateStatsUI(hero.stats);
+                }
             } else {
                 uiCtx.shadowBlur = 0;
             }
 
-            // Draw with Chromatic Kick
             const bob = Math.sin(frame * 0.1) * 4;
-            const squash = 1 + (Math.abs(targetRotation - currentRotation) * 0.2); // Squashes while moving
+            const squash = 1 + (Math.abs(targetRotation - currentRotation) * 0.2);
 
-            // Red Channel Offset
-            uiCtx.fillStyle = "rgba(255,0,0,0.5)";
-            uiCtx.fillRect(x - size/2 + chromaticOffset, y - size/2 + bob, size * squash, size / squash);
-            
-            // Blue Channel Offset
-            uiCtx.fillStyle = "rgba(0,0,255,0.5)";
-            uiCtx.fillRect(x - size/2 - chromaticOffset, y - size/2 + bob, size * squash, size / squash);
-
-            // Main Color
             uiCtx.fillStyle = hero.color;
             uiCtx.fillRect(x - size/2, y - size/2 + bob, size * squash, size / squash);
         });
@@ -149,17 +167,17 @@
             const move = (Math.PI * 2 / heroes.length);
             if (e.key === "ArrowLeft") {
                 targetRotation += move;
-                galleryZoom = 1.08; // Jolt In
-                chromaticOffset = 15; // Kick Colors
+                galleryZoom = 1.08;
+                chromaticOffset = 15;
             }
             if (e.key === "ArrowRight") {
                 targetRotation -= move;
-                galleryZoom = 1.08; 
+                galleryZoom = 1.08;
                 chromaticOffset = -15;
             }
             if (e.key === "Enter") {
-                // Future transition to gameplay
-                console.log("Embarking!");
+                console.log(`Selected ${heroes[selectedIndex].name}!`);
+                startGame();
             }
         }
     });
