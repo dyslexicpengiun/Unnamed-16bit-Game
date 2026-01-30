@@ -3,35 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D-HD RPG | Dreadnought Panning</title>
+    <title>Project Alpha | Dreadnought Scale Fix</title>
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <style>
         :root { --cyan: #00f2ff; --bg: #010103; }
         body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
-        #game-wrapper { position: relative; width: 800px; height: 600px; border: 2px solid #333; overflow: hidden; background: #000; box-shadow: 0 0 100px #000; }
         
-        /* Ship Canvas is behind UI */
+        #game-wrapper { position: relative; width: 800px; height: 600px; border: 2px solid #333; overflow: hidden; background: #000; box-shadow: 0 0 100px #000; }
         canvas { position: absolute; top: 0; left: 0; z-index: 10; image-rendering: pixelated; }
         
+        /* FIXED UI POSITIONING */
         .ui-layer { 
-            position: absolute; width: 100%; height: 100%; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            z-index: 50; color: white; pointer-events: none; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            z-index: 50; 
+            color: white; 
+            pointer-events: none; 
         }
 
         #main-title {
+            position: absolute;
+            top: 150px;
+            left: 50%;
+            transform: translateX(-50%);
             font-family: 'Cinzel Decorative', serif; font-size: 54px; letter-spacing: 12px; margin: 0;
             color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan);
+            width: 100%; text-align: center;
         }
 
-        .menu-options { margin-top: 100px; pointer-events: all; }
+        .menu-options { 
+            position: absolute;
+            top: 320px;
+            left: 100px;
+            pointer-events: all; 
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
         .menu-btn { 
-            background: none; border: none; color: rgba(255,255,255,0.4); font-size: 20px; padding: 10px 40px; cursor: pointer; 
-            font-family: 'IBM Plex Mono', monospace; transition: 0.4s; letter-spacing: 4px; font-style: italic; width: 380px;
+            background: none; border: none; color: rgba(255,255,255,0.4); font-size: 20px; padding: 10px 20px; cursor: pointer; 
+            font-family: 'IBM Plex Mono', monospace; transition: 0.4s; letter-spacing: 4px; font-style: italic; 
             text-align: left; border-left: 0px solid var(--cyan);
         }
-        .menu-btn:hover { color: #fff; text-shadow: 0 0 15px #fff; transform: translateX(20px); }
-        .menu-btn.active { color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan); border-left: 6px solid var(--cyan); background: linear-gradient(90deg, rgba(0,242,255,0.1), transparent); }
+        .menu-btn:hover, .menu-btn.active { color: #fff; text-shadow: 0 0 15px #fff; transform: translateX(20px); border-left: 6px solid var(--cyan); background: linear-gradient(90deg, rgba(0,242,255,0.1), transparent); }
 
         #crt-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%); background-size: 100% 3px; pointer-events: none; z-index: 100; }
     </style>
@@ -41,8 +59,7 @@
 <div id="game-wrapper">
     <div id="crt-overlay"></div>
     <canvas id="mainCanvas"></canvas>
-    
-    <div id="menu-layer" class="ui-layer">
+    <div class="ui-layer">
         <h1 id="main-title">PROJECT ALPHA</h1>
         <div class="menu-options">
             <button class="menu-btn" data-action="new-game">INITIALIZE MISSION</button>
@@ -74,53 +91,53 @@ const MenuSystem = {
     shipImg: new Image(),
     imgLoaded: false,
     stars: [],
-    shipX: 0, // Current scroll position
+    shipX: 0,
 
     init() {
+        // Force CORS to help image loading
+        this.shipImg.crossOrigin = "anonymous";
         this.shipImg.src = 'ship.png'; 
         this.shipImg.onload = () => { this.imgLoaded = true; };
         
-        for(let i=0; i<150; i++) {
-            this.stars.push({ x: Math.random()*800, y: Math.random()*600, s: Math.random()*2, v: Math.random()*0.3 });
+        for(let i=0; i<100; i++) {
+            this.stars.push({ x: Math.random()*800, y: Math.random()*600, s: Math.random()*2, v: Math.random()*0.2 });
         }
     },
 
     draw(ctx) {
-        // 1. Space
         ctx.fillStyle = "#010105";
         ctx.fillRect(0, 0, 800, 600);
 
-        // 2. Parallax Stars
+        // Stars
         ctx.fillStyle = "#fff";
         this.stars.forEach(s => {
             s.y -= s.v; if(s.y < 0) s.y = 600;
-            ctx.globalAlpha = 0.3;
+            ctx.globalAlpha = 0.2;
             ctx.fillRect(s.x, s.y, s.s, s.s);
         });
         ctx.globalAlpha = 1.0;
 
-        // 3. The 4X Massive Dreadnought
-        const shipW = 3200; // 4x width of game screen
-        const shipH = 800;
-        
-        // Pan the ship slowly across the screen
-        this.shipX -= 0.5;
+        // Ship logic: Limit total pixel area to avoid browser crashes
+        const shipW = 2000; 
+        const shipH = 600;
+        this.shipX -= 0.3;
         if (this.shipX < -shipW) this.shipX = 800;
 
-        const bob = Math.sin(Engine.frame * 0.01) * 15;
+        const bob = Math.sin(Engine.frame * 0.005) * 10;
 
         if (this.imgLoaded) {
-            ctx.drawImage(this.shipImg, this.shipX, 100 + bob, shipW, shipH);
+            ctx.drawImage(this.shipImg, this.shipX, 50 + bob, shipW, shipH);
         } else {
-            // Placeholder: A massive gray bar so you know the ship is working
-            ctx.fillStyle = "rgba(50, 50, 50, 0.8)";
-            ctx.fillRect(this.shipX, 200 + bob, shipW, 200);
-            ctx.fillStyle = "#fff";
-            ctx.fillText("LOADING DREADNOUGHT ASSET...", this.shipX + 100, 300);
+            // DEBUG BOX: Visible if ship.png is missing or broken
+            ctx.fillStyle = "rgba(40, 40, 50, 0.9)";
+            ctx.fillRect(this.shipX, 150 + bob, shipW, 300);
+            ctx.fillStyle = "white";
+            ctx.fillText("SEARCHING FOR ship.png...", this.shipX + 850, 300);
         }
     }
 };
 
+// Handle button hover logic
 document.querySelectorAll('.menu-btn').forEach(btn => {
     btn.addEventListener('mouseenter', () => btn.classList.add('active'));
     btn.addEventListener('mouseleave', () => btn.classList.remove('active'));
