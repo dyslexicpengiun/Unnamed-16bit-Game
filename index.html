@@ -3,33 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D-HD RPG | Main Menu (Visual Test)</title>
+    <title>2D-HD RPG | Procedural Space Menu</title>
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <style>
-        :root { --glow: #fff; --bg: #050505; }
+        :root { --glow: #fff; --bg: #020205; }
         body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         
-        #game-wrapper { position: relative; width: 800px; height: 600px; border: 2px solid #222; overflow: hidden; box-shadow: 0 0 50px #000; }
+        #game-wrapper { position: relative; width: 800px; height: 600px; border: 2px solid #333; overflow: hidden; background: #000; box-shadow: 0 0 100px #000; }
         canvas { position: absolute; top: 0; left: 0; }
 
         #crt-overlay { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
             background-size: 100% 3px, 3px 100%; pointer-events: none; z-index: 100; 
         }
 
-        .ui-layer { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; color: white; transition: opacity 0.6s ease;}
+        .ui-layer { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; color: white; transition: opacity 0.8s ease;}
         .hidden { opacity: 0; pointer-events: none; }
 
         .menu-btn { 
-            background: none; border: none; color: rgba(255,255,255,0.7); font-size: 24px; padding: 10px; cursor: pointer; 
-            font-family: 'IBM Plex Mono', monospace; transition: 0.3s; letter-spacing: 2px; font-style: italic;
+            background: none; border: none; color: rgba(255,255,255,0.6); font-size: 22px; padding: 12px; cursor: pointer; 
+            font-family: 'IBM Plex Mono', monospace; transition: 0.4s; letter-spacing: 3px; font-style: italic;
         }
-        .menu-btn:hover { color: #fff; text-shadow: 0 0 10px #fff; transform: scale(1.05); }
+        .menu-btn:hover { color: #fff; text-shadow: 0 0 15px #fff; transform: translateX(10px); }
+        .menu-btn.active { color: #fff; text-shadow: 0 0 20px #fff; }
 
         #main-title {
-            font-family: 'Cinzel Decorative', serif; font-size: 50px; letter-spacing: 8px; margin-bottom: 20px;
-            text-shadow: 0 0 15px rgba(255,255,255,0.7), 0 2px 0 #000;
+            font-family: 'Cinzel Decorative', serif; font-size: 52px; letter-spacing: 12px; margin-top: -20px;
+            text-shadow: 0 0 20px rgba(255,255,255,0.5), 0 2px 4px #000;
         }
     </style>
 </head>
@@ -39,15 +40,14 @@
     <div id="crt-overlay"></div>
     <canvas id="mainCanvas"></canvas>
 
-    <!-- MAIN MENU LAYER -->
     <div id="menu-layer" class="ui-layer">
-        <div id="title-container" style="text-align: center; margin-bottom: 60px;">
-            <canvas id="crestCanvas" width="150" height="150"></canvas>
+        <div id="title-container" style="display: flex; flex-direction: column; align-items: center; margin-bottom: 60px;">
+            <!-- Crest is now drawn on the main canvas for better integration -->
             <h1 id="main-title">PROJECT ALPHA</h1>
         </div>
         
-        <div id="menu-options" style="display:flex; flex-direction:column; gap: 15px;">
-            <button class="menu-btn active" data-action="new-game">START JOURNEY</button>
+        <div id="menu-options">
+            <button class="menu-btn" data-action="new-game">START JOURNEY</button>
             <button class="menu-btn" data-action="settings">OPTIONS</button>
             <button class="menu-btn" data-action="exit">EXIT</button>
         </div>
@@ -55,86 +55,118 @@
 </div>
 
 <script>
-/**
- * CORE ENGINE MODULE
- */
 const Engine = {
     canvas: document.getElementById('mainCanvas'),
     ctx: document.getElementById('mainCanvas').getContext('2d'),
     width: 800, height: 600, state: 'MENU', frame: 0,
     init() {
         this.canvas.width = this.width; this.canvas.height = this.height;
-        MenuSystem.loadAssets(); 
-        MenuSystem.drawCrest(); 
+        MenuSystem.init();
         this.loop();
     },
     loop() {
-        this.frame++; this.ctx.clearRect(0, 0, this.width, this.height);
-        switch(this.state) { case 'MENU': MenuSystem.draw(this.ctx); break; }
+        this.frame++;
+        this.ctx.clearRect(0, 0, this.width, this.height);
+        if(this.state === 'MENU') MenuSystem.update(this.ctx);
         requestAnimationFrame(() => this.loop());
     }
 };
 
-/**
- * MENU SYSTEM MODULE
- */
 const MenuSystem = {
-    backgroundImage: null,
-    particles: Array.from({length: 40}, () => ({ x: Math.random() * 800, y: Math.random() * 600, s: Math.random() * 2 + 1, v: Math.random() * 0.5 + 0.2 })),
+    stars: [],
+    nebulas: [],
 
-    loadAssets() {
-        this.backgroundImage = new Image();
-        // Public domain, direct linkable space pixel art image from RawPixel (via Wikimedia Commons)
-        this.backgroundImage.src = 'https://upload.wikimedia.org'; 
-        this.backgroundImage.onload = () => console.log("Background loaded!");
-        this.backgroundImage.onerror = () => console.error("Background failed to load. Check the URL or internet connection!");
+    init() {
+        // Create 150 unique stars
+        for(let i=0; i<150; i++) {
+            this.stars.push({
+                x: Math.random() * 800,
+                y: Math.random() * 600,
+                size: Math.random() * 2,
+                blink: Math.random() * Math.PI,
+                speed: Math.random() * 0.2 + 0.05
+            });
+        }
+        // Create 3 nebula clouds
+        this.nebulas = [
+            { x: 200, y: 200, color: 'rgba(50, 0, 150, 0.2)', size: 300 },
+            { x: 600, y: 400, color: 'rgba(150, 0, 50, 0.15)', size: 400 },
+            { x: 400, y: 300, color: 'rgba(0, 100, 150, 0.1)', size: 500 }
+        ];
     },
 
-    draw(ctx) {
-        if (this.backgroundImage && this.backgroundImage.complete) {
-            // Draw background image, scaled to fill
-            ctx.drawImage(this.backgroundImage, 0, 0, Engine.width, Engine.height);
-        } else {
-            // Fallback gradient
-            const grad = ctx.createRadialGradient(400, 300, 0, 400, 300, 500); grad.addColorStop(0, '#1a1a1a'); grad.addColorStop(1, '#000');
-            ctx.fillStyle = grad; ctx.fillRect(0, 0, 800, 600);
-        }
+    update(ctx) {
+        // 1. Space Gradient
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, 600);
+        bgGrad.addColorStop(0, '#020208');
+        bgGrad.addColorStop(1, '#0a0a1a');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0,0,800,600);
+
+        // 2. Draw Nebulas
+        this.nebulas.forEach(n => {
+            const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.size);
+            g.addColorStop(0, n.color);
+            g.addColorStop(1, 'transparent');
+            ctx.fillStyle = g;
+            ctx.fillRect(0,0,800,600);
+        });
+
+        // 3. Draw Twinkling Stars
+        ctx.fillStyle = "#fff";
+        this.stars.forEach(s => {
+            s.y -= s.speed; // Subtle parallax drift
+            if(s.y < 0) s.y = 600;
+            
+            const alpha = 0.3 + Math.abs(Math.sin(s.blink + Engine.frame * 0.02)) * 0.7;
+            ctx.globalAlpha = alpha;
+            ctx.fillRect(s.x, s.y, s.size, s.size);
+        });
+        ctx.globalAlpha = 1.0;
+
+        // 4. Draw the Sword/Shield Crest behind title
+        this.drawCrest(ctx);
+    },
+
+    drawCrest(ctx) {
+        const centerX = 400;
+        const centerY = 240;
         
-        // Add subtle vignette on top of image
-        ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(0,0,800,600);
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        
+        // Glow
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = "rgba(255,255,255,0.3)";
+        
+        // Shield Shape
+        ctx.fillStyle = "rgba(255,255,255,0.05)";
+        ctx.strokeStyle = "rgba(255,255,255,0.2)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -60); // Top
+        ctx.quadraticCurveTo(50, -50, 60, 0); // Right side
+        ctx.quadraticCurveTo(55, 60, 0, 90); // Bottom tip
+        ctx.quadraticCurveTo(-55, 60, -60, 0); // Left side
+        ctx.quadraticCurveTo(-50, -50, 0, -60);
+        ctx.fill();
+        ctx.stroke();
 
-        // Floating "Dust" Particles (Parallax)
-        ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
-        this.particles.forEach(p => { p.y -= p.v; if (p.y < 0) p.y = 600; ctx.fillRect(p.x, p.y, p.s, p.s); });
-    },
-
-    drawCrest() {
-        const c_ctx = document.getElementById('crestCanvas').getContext('2d');
-        const size = 150;
-        c_ctx.fillStyle = '#aaa'; c_ctx.beginPath(); c_ctx.moveTo(size/2, 10); c_ctx.lineTo(size-20, size/2); c_ctx.lineTo(size/2, size-10); c_ctx.lineTo(20, size/2); c_ctx.closePath();
-        c_ctx.shadowColor = '#fff'; c_ctx.shadowBlur = 10; c_ctx.fill(); c_ctx.fillStyle = '#333';
-        c_ctx.font = '30px serif'; c_ctx.textAlign = 'center'; c_ctx.fillText('A', size/2, size/2 + 10);
-        c_ctx.shadowBlur = 0;
-    },
-    
-    handleInput(action) {
-        if (action === 'new-game') {
-            document.getElementById('menu-layer').classList.add('hidden');
-            Engine.state = 'CHAR_SELECT';
-        }
+        // Sword (Simplified Italic silhouette)
+        ctx.rotate(-Math.PI / 4); // Slanted like Fire Emblem logo
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        ctx.fillRect(-2, -80, 4, 160); // Blade
+        ctx.fillRect(-15, 40, 30, 4); // Guard
+        
+        ctx.restore();
     }
 };
 
-/**
- * INPUT LISTENERS
- */
 document.querySelectorAll('.menu-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        MenuSystem.handleInput(e.target.dataset.action);
-    });
+    btn.addEventListener('mouseenter', () => btn.classList.add('active'));
+    btn.addEventListener('mouseleave', () => btn.classList.remove('active'));
 });
 
-// Boot the engine
 Engine.init();
 </script>
 </body>
