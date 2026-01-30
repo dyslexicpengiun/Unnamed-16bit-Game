@@ -3,21 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>16-bit RPG | HD Gallery</title>
+    <title>16-bit RPG | Rotating Gallery</title>
     <style>
-        body { margin: 0; background: #010101; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
         #shake-wrapper { position: relative; width: 800px; height: 600px; }
-        #game-container { position: relative; width: 100%; height: 100%; border: 2px solid #333; overflow: hidden; background: #000; box-shadow: 0 0 100px rgba(0,0,0,1); }
+        #game-container { position: relative; width: 100%; height: 100%; border: 2px solid #333; overflow: hidden; background: #000; }
         canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
         
-        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; transition: opacity 0.5s ease; color: white; background: rgba(0,0,0,0.95); }
-        .hidden { opacity: 0; pointer-events: none; }
+        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; color: white; background: rgba(0,0,0,0.9); }
+        .hidden { display: none; }
         
-        /* Title and Instructions */
-        .menu-title { font-size: 40px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 5px; }
-        .controls-hint { position: absolute; bottom: 30px; font-size: 14px; opacity: 0.6; }
-        
-        #flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; pointer-events: none; z-index: 100; }
+        .menu-title { font-size: 50px; text-shadow: 0 0 20px #fff; margin-bottom: 40px; }
+        .btn { background: none; border: 2px solid white; color: white; padding: 15px 40px; font-size: 20px; cursor: pointer; transition: 0.3s; }
+        .btn:hover { background: white; color: black; box-shadow: 0 0 20px #fff; }
     </style>
 </head>
 <body>
@@ -32,14 +30,16 @@
             <button class="btn" onclick="showCharacterSelect()">PRESS START</button>
         </div>
 
-        <!-- CHARACTER SELECT (Visuals handled by Canvas) -->
-        <div id="char-select" class="ui-overlay hidden" style="background: transparent;">
-            <div class="controls-hint">USE ARROWS TO ROTATE | [ENTER] TO CHOOSE</div>
+        <!-- CHARACTER SELECT OVERLAY (Just for text) -->
+        <div id="char-select-ui" class="ui-overlay hidden" style="background: transparent; pointer-events: none;">
+            <h2 id="hero-name" style="margin-top: 350px; font-size: 32px; letter-spacing: 5px;"></h2>
+            <p id="hero-bio" style="opacity: 0.6;"></p>
+            <p style="margin-top: 50px; font-size: 12px; opacity: 0.4;">[LEFT/RIGHT] TO ROTATE | [ENTER] TO SELECT</p>
         </div>
 
         <canvas id="battleCanvas"></canvas>
         <canvas id="worldCanvas"></canvas>
-        <canvas id="uiCanvas"></canvas> <!-- New layer for the Spotlight/Gallery UI -->
+        <canvas id="uiCanvas"></canvas>
     </div>
 </div>
 
@@ -50,92 +50,83 @@
     const worldCtx = worldCanvas.getContext('2d');
     const battleCanvas = document.getElementById('battleCanvas');
     const battleCtx = battleCanvas.getContext('2d');
-    const flashEl = document.getElementById('flash');
-    const shakeWrapper = document.getElementById('shake-wrapper');
-
-    const startScreen = document.getElementById('start-screen');
-    const charSelect = document.getElementById('char-select');
 
     const WIDTH = 800; const HEIGHT = 600;
     [uiCanvas, worldCanvas, battleCanvas].forEach(c => { c.width = WIDTH; c.height = HEIGHT; });
 
     let gameState = "MENU";
     let frame = 0;
-    let inBattle = false;
-    let transitionActive = false;
-    let shakePower = 0;
-
-    // --- GALLERY DATA ---
-    const heroes = [
-        { name: "WARRIOR", color: "#ffccaa", bio: "Strength & Honor", h: 30 },
-        { name: "MAGE", color: "#aaccff", bio: "Arcane Mastery", h: 210 },
-        { name: "ROGUE", color: "#ccffaa", bio: "Shadow Stalker", h: 120 },
-        { name: "PALADIN", color: "#ffeeaa", bio: "Divine Shield", h: 50 }
-    ];
-    let selectedHeroIndex = 0;
     let targetRotation = 0;
     let currentRotation = 0;
+    let selectedIndex = 0;
+
+    const heroes = [
+        { name: "WARRIOR", color: "#ffccaa", bio: "UNSTOPPABLE MIGHT" },
+        { name: "MAGE", color: "#aaccff", bio: "ARCANE DOMINANCE" },
+        { name: "ROGUE", color: "#ccffaa", bio: "DEADLY PRECISION" },
+        { name: "PALADIN", color: "#ffeeaa", bio: "DIVINE PROTECTION" }
+    ];
 
     function showCharacterSelect() {
         gameState = "CHAR_SELECT";
-        startScreen.classList.add('hidden');
-        charSelect.classList.remove('hidden');
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('char-select-ui').classList.remove('hidden');
     }
 
-    function startGame() {
-        gameState = "PLAYING";
-        charSelect.classList.add('hidden');
-        flashEl.style.opacity = "1";
-        setTimeout(() => { flashEl.style.transition = "opacity 1s"; flashEl.style.opacity = "0"; }, 50);
-    }
-
-    // --- RENDERING GALLERY ---
     function drawGallery() {
         uiCtx.clearRect(0, 0, WIDTH, HEIGHT);
         
-        // Darkened Background for Select Screen
-        uiCtx.fillStyle = "rgba(0,0,0,0.85)";
+        // 1. Solid Background
+        uiCtx.fillStyle = "#050505";
         uiCtx.fillRect(0,0,WIDTH,HEIGHT);
 
-        // Calculate Rotation Smoothing
+        // 2. Spotlight Floor
+        const floorGrad = uiCtx.createRadialGradient(WIDTH/2, HEIGHT/2 + 100, 20, WIDTH/2, HEIGHT/2 + 100, 400);
+        floorGrad.addColorStop(0, "rgba(50, 50, 50, 0.5)");
+        floorGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+        uiCtx.fillStyle = floorGrad;
+        uiCtx.fillRect(0,0,WIDTH,HEIGHT);
+
+        // 3. Smooth Rotation Math
         currentRotation += (targetRotation - currentRotation) * 0.1;
 
-        // Spotlight Effect
-        const grad = uiCtx.createRadialGradient(WIDTH/2, HEIGHT/2, 50, WIDTH/2, HEIGHT/2, 300);
-        grad.addColorStop(0, "rgba(255,255,255,0.05)");
-        grad.addColorStop(1, "rgba(0,0,0,0.9)");
-        uiCtx.fillStyle = grad;
-        uiCtx.fillRect(0,0,WIDTH,HEIGHT);
-
-        heroes.forEach((hero, i) => {
-            // Circle math for the "Isaac" rotation
+        // 4. Sort heroes by "Z" so the ones in back are drawn first
+        const sortedHeroes = heroes.map((h, i) => {
             const angle = (i * (Math.PI * 2 / heroes.length)) + currentRotation;
-            const x = WIDTH/2 + Math.sin(angle) * 250;
-            const z = Math.cos(angle); // Use Z for depth scaling
-            const y = HEIGHT/2 + z * 50;
-            
-            const scale = (z + 2) / 2; // 0.5 to 1.5
-            const size = 50 * scale;
-            const alpha = (z + 1) / 2; // Fade out back heroes
+            return { ...h, angle, z: Math.cos(angle) };
+        }).sort((a, b) => a.z - b.z);
 
-            // Draw Hero Sprite
-            uiCtx.globalAlpha = alpha;
-            uiCtx.fillStyle = hero.color;
-            uiCtx.shadowBlur = i === selectedHeroIndex ? 20 : 0;
-            uiCtx.shadowColor = hero.color;
-            uiCtx.fillRect(x - size/2, y - size/2, size, size);
+        sortedHeroes.forEach(hero => {
+            const x = WIDTH/2 + Math.sin(hero.angle) * 280;
+            const y = HEIGHT/2 + hero.z * 60; // The "flat" ellipse look
+            const scale = (hero.z + 2.5) / 2.5; // Scale from front to back
+            const size = 60 * scale;
+            const alpha = (hero.z + 1.2) / 2.2;
+
+            uiCtx.globalAlpha = Math.max(0.1, alpha);
             
-            // Draw Name under selected hero
-            if (i === selectedHeroIndex && Math.abs(targetRotation - currentRotation) < 0.1) {
-                uiCtx.globalAlpha = 1;
-                uiCtx.fillStyle = "white";
-                uiCtx.font = "bold 24px monospace";
-                uiCtx.textAlign = "center";
-                uiCtx.fillText(hero.name, WIDTH/2, HEIGHT/2 + 150);
-                uiCtx.font = "14px monospace";
-                uiCtx.fillText(hero.bio, WIDTH/2, HEIGHT/2 + 180);
+            // Character Shadow
+            uiCtx.fillStyle = "rgba(0,0,0,0.5)";
+            uiCtx.beginPath();
+            uiCtx.ellipse(x, y + size/2, 20 * scale, 5 * scale, 0, 0, Math.PI*2);
+            uiCtx.fill();
+
+            // Character Glow (Only for the one in front)
+            if (hero.z > 0.9) {
+                uiCtx.shadowBlur = 30;
+                uiCtx.shadowColor = hero.color;
+                document.getElementById('hero-name').innerText = hero.name;
+                document.getElementById('hero-bio').innerText = hero.bio;
+            } else {
+                uiCtx.shadowBlur = 0;
             }
+
+            // Character Sprite
+            uiCtx.fillStyle = hero.color;
+            const bob = Math.sin(frame * 0.1) * 5 * scale;
+            uiCtx.fillRect(x - size/2, y - size/2 + bob, size, size);
         });
+
         uiCtx.shadowBlur = 0;
         uiCtx.globalAlpha = 1;
     }
@@ -144,9 +135,6 @@
         frame++;
         if (gameState === "CHAR_SELECT") {
             drawGallery();
-        } else if (gameState === "PLAYING" || gameState === "BATTLE" || transitionActive) {
-            // (Standard Town/Battle logic here)
-            // ... truncated for brevity ...
         }
         requestAnimationFrame(mainLoop);
     }
@@ -154,16 +142,16 @@
     window.addEventListener('keydown', (e) => {
         if (gameState === "CHAR_SELECT") {
             if (e.key === "ArrowLeft") {
-                selectedHeroIndex = (selectedHeroIndex - 1 + heroes.length) % heroes.length;
                 targetRotation += (Math.PI * 2 / heroes.length);
             }
             if (e.key === "ArrowRight") {
-                selectedHeroIndex = (selectedHeroIndex + 1) % heroes.length;
                 targetRotation -= (Math.PI * 2 / heroes.length);
             }
-            if (e.key === "Enter") startGame();
+            if (e.key === "Enter") {
+                console.log("Hero Selected!");
+                // Add your startGame logic here
+            }
         }
-        // (Existing 'B' and 'R' keys)
     });
 
     mainLoop();
