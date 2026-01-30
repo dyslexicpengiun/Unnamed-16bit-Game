@@ -3,100 +3,132 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D-HD RPG | Battlecruiser Edition</title>
+    <title>Project Alpha | Dreadnought Command</title>
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <style>
-        :root { --glow: #fff; --bg: #010103; --cyan: #00f2ff; }
+        :root { --cyan: #00f2ff; --bg: #010103; }
         body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
+        
         #game-wrapper { position: relative; width: 800px; height: 600px; border: 2px solid #333; overflow: hidden; background: #000; box-shadow: 0 0 100px #000; }
-        canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
-        #crt-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.15) 50%); background-size: 100% 3px; pointer-events: none; z-index: 100; }
-        .ui-layer { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; color: white; }
-        #main-title { font-family: 'Cinzel Decorative', serif; font-size: 54px; letter-spacing: 12px; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan); z-index: 60; }
-        .menu-btn { background: none; border: none; color: rgba(255,255,255,0.4); font-size: 20px; padding: 10px 40px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; transition: 0.4s; letter-spacing: 4px; font-style: italic; width: 350px; text-align: left; }
+        
+        /* LAYERING: Canvas (Ship) is behind the UI-Layer (Title) */
+        canvas { position: absolute; top: 0; left: 0; z-index: 10; image-rendering: pixelated; }
+        
+        .ui-layer { 
+            position: absolute; width: 100%; height: 100%; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            z-index: 50; /* Higher than canvas */
+            color: white; pointer-events: none; 
+        }
+
+        #main-title {
+            font-family: 'Cinzel Decorative', serif; font-size: 54px; letter-spacing: 12px; margin: 0;
+            color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan);
+            animation: titlePulse 4s ease-in-out infinite;
+        }
+
+        .menu-options { margin-top: 100px; pointer-events: all; }
+        .menu-btn { 
+            background: none; border: none; color: rgba(255,255,255,0.4); font-size: 20px; padding: 10px 40px; cursor: pointer; 
+            font-family: 'IBM Plex Mono', monospace; transition: 0.4s; letter-spacing: 4px; font-style: italic; width: 380px;
+            text-align: left; border-left: 0px solid var(--cyan);
+        }
         .menu-btn:hover { color: #fff; text-shadow: 0 0 15px #fff; transform: translateX(20px); }
+        .menu-btn.active { color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan); border-left: 6px solid var(--cyan); background: linear-gradient(90deg, rgba(0,242,255,0.1), transparent); }
+
+        #crt-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%); background-size: 100% 3px; pointer-events: none; z-index: 100; }
+        
+        @keyframes titlePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
     </style>
 </head>
 <body>
 
-<div id="game-wrapper">
-    <div id="crt-overlay"></div>
-    <canvas id="mainCanvas"></canvas>
-    <div id="menu-layer" class="ui-layer">
-        <h1 id="main-title">PROJECT ALPHA</h1>
-        <div class="menu-options" style="margin-top:100px; display:flex; flex-direction:column; gap:12px;">
-            <button class="menu-btn">INITIALIZE MISSION</button>
-            <button class="menu-btn">SYSTEM CONFIG</button>
-            <button class="menu-btn">TERMINATE</button>
+<div id="shake-wrapper">
+    <div id="game-wrapper">
+        <div id="crt-overlay"></div>
+        <canvas id="mainCanvas"></canvas>
+        
+        <div id="menu-layer" class="ui-layer">
+            <h1 id="main-title">PROJECT ALPHA</h1>
+            <div class="menu-options">
+                <button class="menu-btn" data-action="new-game">INITIALIZE MISSION</button>
+                <button class="menu-btn" data-action="settings">SYSTEM CONFIG</button>
+                <button class="menu-btn" data-action="exit">TERMINATE</button>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-/**
- * MODULAR ENGINE
- */
 const Engine = {
     canvas: document.getElementById('mainCanvas'),
     ctx: document.getElementById('mainCanvas').getContext('2d'),
-    state: 'MENU',
-    frame: 0,
+    width: 800, height: 600, frame: 0,
     init() {
-        this.canvas.width = 800; this.canvas.height = 600;
+        this.canvas.width = this.width; this.canvas.height = this.height;
         MenuSystem.init();
         this.loop();
     },
     loop() {
         this.frame++;
-        this.ctx.clearRect(0, 0, 800, 600);
-        if(this.state === 'MENU') MenuSystem.draw(this.ctx);
+        this.ctx.clearRect(0, 0, this.width, this.height);
+        MenuSystem.draw(this.ctx);
         requestAnimationFrame(() => this.loop());
     }
 };
 
-/**
- * MENU SYSTEM (Asset Based)
- */
 const MenuSystem = {
     shipImg: new Image(),
-    stars: [],
     loaded: false,
+    stars: [],
 
     init() {
-        // !!! IMPORTANT: Save your Dreamstime image as 'ship.png' in the same folder
+        // !!! Ensure 'ship.png' is in your folder !!!
         this.shipImg.src = 'ship.png'; 
         this.shipImg.onload = () => { this.loaded = true; };
-
-        // Generate Parallax Star Field
-        for(let i=0; i<150; i++) {
-            this.stars.push({ x: Math.random()*800, y: Math.random()*600, s: Math.random()*2, v: Math.random()*0.4+0.1 });
+        
+        for(let i=0; i<200; i++) {
+            this.stars.push({ x: Math.random()*800, y: Math.random()*600, s: Math.random()*2, v: Math.random()*0.2+0.05 });
         }
     },
 
     draw(ctx) {
-        // Space BG
-        ctx.fillStyle = "#010108"; ctx.fillRect(0,0,800,600);
+        // Space Background
+        ctx.fillStyle = "#010105";
+        ctx.fillRect(0,0,800,600);
 
-        // 1. Draw Parallax Stars
+        // 1. Stars (Deepest layer)
         ctx.fillStyle = "#fff";
         this.stars.forEach(s => {
             s.y -= s.v; if(s.y < 0) s.y = 600;
-            ctx.globalAlpha = 0.3 + Math.random()*0.5;
+            ctx.globalAlpha = 0.2 + Math.random()*0.4;
             ctx.fillRect(s.x, s.y, s.s, s.s);
         });
         ctx.globalAlpha = 1.0;
 
-        // 2. Draw Battlecruiser Asset
+        // 2. Draw 4X Scale Ship (Middle layer)
         if(this.loaded) {
-            const bob = Math.sin(Engine.frame * 0.02) * 5;
-            // Draw centered with a 2D-HD glow
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = "rgba(0, 242, 255, 0.3)";
-            ctx.drawImage(this.shipImg, 100, 200 + bob, 600, 200); // Scaled for wide battlecruisers
-            ctx.shadowBlur = 0;
+            const bob = Math.sin(Engine.frame * 0.01) * 10;
+            const shipW = 2400; // 4x Larger than 600
+            const shipH = 800;  // 4x Larger than 200
+            
+            ctx.save();
+            // Center it horizontally, but let it drift slightly
+            ctx.drawImage(
+                this.shipImg, 
+                400 - (shipW / 2), // Horizontal center
+                150 - (shipH / 4) + bob, // Positioned behind the title height
+                shipW, shipH
+            );
+            ctx.restore();
         }
     }
 };
+
+document.querySelectorAll('.menu-btn').forEach(btn => {
+    btn.addEventListener('mouseenter', () => btn.classList.add('active'));
+    btn.addEventListener('mouseleave', () => btn.classList.remove('active'));
+});
 
 Engine.init();
 </script>
