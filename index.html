@@ -3,33 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D-HD RPG | Procedural Space Menu</title>
+    <title>Project Alpha | 2D-HD Space RPG</title>
+    <!-- Premium Fonts -->
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <style>
-        :root { --glow: #fff; --bg: #020205; }
-        body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
-        
-        #game-wrapper { position: relative; width: 800px; height: 600px; border: 2px solid #333; overflow: hidden; background: #000; box-shadow: 0 0 100px #000; }
-        canvas { position: absolute; top: 0; left: 0; }
+        :root { 
+            --glow: #fff; 
+            --bg: #020205; 
+            --accent: rgba(0, 150, 255, 0.8);
+        }
 
+        body { 
+            margin: 0; 
+            background: var(--bg); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            overflow: hidden; 
+            font-family: 'Courier New', monospace; 
+        }
+        
+        #game-wrapper { 
+            position: relative; 
+            width: 800px; 
+            height: 600px; 
+            border: 2px solid #333; 
+            overflow: hidden; 
+            background: #000; 
+            box-shadow: 0 0 100px #000; 
+        }
+
+        canvas { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            image-rendering: pixelated; 
+        }
+
+        /* CRT Scanline Overlay */
         #crt-overlay { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
-            background-size: 100% 3px, 3px 100%; pointer-events: none; z-index: 100; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+            background-size: 100% 3px, 3px 100%; 
+            pointer-events: none; 
+            z-index: 100; 
         }
 
-        .ui-layer { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; color: white; transition: opacity 0.8s ease;}
-        
-        .menu-btn { 
-            background: none; border: none; color: rgba(255,255,255,0.6); font-size: 22px; padding: 12px; cursor: pointer; 
-            font-family: 'IBM Plex Mono', monospace; transition: 0.4s; letter-spacing: 3px; font-style: italic;
+        /* UI State Layers */
+        .ui-layer { 
+            position: absolute; 
+            width: 100%; 
+            height: 100%; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 50; 
+            color: white; 
+            transition: opacity 1s ease;
         }
-        .menu-btn:hover { color: #fff; text-shadow: 0 0 15px #fff; transform: translateX(10px); }
-        .menu-btn.active { color: #fff; text-shadow: 0 0 20px #fff; }
+
+        .hidden { opacity: 0; pointer-events: none; }
+
+        /* Octopath Style Menu Buttons */
+        .menu-options { 
+            margin-top: 60px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+        }
+
+        .menu-btn { 
+            background: none; 
+            border: none; 
+            color: rgba(255,255,255,0.5); 
+            font-size: 22px; 
+            padding: 10px 40px; 
+            cursor: pointer; 
+            font-family: 'IBM Plex Mono', monospace; 
+            transition: 0.4s cubic-bezier(0.17, 0.67, 0.83, 0.67); 
+            letter-spacing: 4px; 
+            font-style: italic;
+            text-align: left;
+            width: 300px;
+        }
+
+        .menu-btn:hover { 
+            color: #fff; 
+            text-shadow: 0 0 15px #fff; 
+            transform: translateX(15px); 
+        }
+
+        .menu-btn.active { 
+            color: #fff; 
+            text-shadow: 0 0 20px #fff; 
+            border-left: 3px solid #fff;
+        }
 
         #main-title {
-            font-family: 'Cinzel Decorative', serif; font-size: 52px; letter-spacing: 12px; margin-top: 20px;
-            text-shadow: 0 0 20px rgba(255,255,255,0.5), 0 2px 4px #000;
+            font-family: 'Cinzel Decorative', serif; 
+            font-size: 54px; 
+            letter-spacing: 14px; 
+            margin: 0;
+            text-shadow: 0 0 25px rgba(255,255,255,0.4), 0 2px 5px #000;
+            z-index: 60;
         }
     </style>
 </head>
@@ -41,7 +124,7 @@
 
     <div id="menu-layer" class="ui-layer">
         <h1 id="main-title">PROJECT ALPHA</h1>
-        <div id="menu-options" style="margin-top: 40px;">
+        <div class="menu-options">
             <button class="menu-btn" data-action="new-game">START JOURNEY</button>
             <button class="menu-btn" data-action="settings">OPTIONS</button>
             <button class="menu-btn" data-action="exit">EXIT</button>
@@ -51,12 +134,16 @@
 
 <script>
 /**
- * THE CORE ENGINE
+ * CORE ENGINE MODULE
+ * Manages the main game loop and global states.
  */
 const Engine = {
     canvas: document.getElementById('mainCanvas'),
     ctx: document.getElementById('mainCanvas').getContext('2d'),
-    width: 800, height: 600, state: 'MENU', frame: 0,
+    width: 800, 
+    height: 600, 
+    state: 'MENU', 
+    frame: 0,
     
     init() {
         this.canvas.width = this.width;
@@ -69,10 +156,12 @@ const Engine = {
         this.frame++;
         this.ctx.clearRect(0, 0, this.width, this.height);
         
-        // Modular Rendering
-        if(this.state === 'MENU') {
-            MenuSystem.drawBackground(this.ctx);
-            MenuSystem.drawCrest(this.ctx);
+        // State Machine Rendering
+        switch(this.state) {
+            case 'MENU':
+                MenuSystem.draw(this.ctx);
+                break;
+            // Additional states (CHAR_SELECT, WORLD) will be added here
         }
         
         requestAnimationFrame(() => this.loop());
@@ -81,92 +170,123 @@ const Engine = {
 
 /**
  * MENU SYSTEM MODULE
+ * Handles procedural space background and spaceship crest.
  */
 const MenuSystem = {
     stars: [],
     nebulas: [],
 
     init() {
-        // Build Procedural Space
-        for(let i=0; i<150; i++) {
+        // Create Star Field
+        for(let i=0; i<180; i++) {
             this.stars.push({
                 x: Math.random() * 800,
                 y: Math.random() * 600,
-                size: Math.random() * 2,
-                blink: Math.random() * 5,
-                v: Math.random() * 0.2 + 0.05
+                size: Math.random() * 2 + 0.5,
+                blink: Math.random() * 10,
+                v: Math.random() * 0.3 + 0.1
             });
         }
+        // Create Nebula Clouds
         this.nebulas = [
-            { x: 200, y: 200, color: 'rgba(50, 0, 150, 0.1)', r: 300 },
-            { x: 600, y: 400, color: 'rgba(150, 0, 50, 0.1)', r: 350 }
+            { x: 150, y: 150, color: 'rgba(0, 100, 255, 0.08)', r: 350 },
+            { x: 650, y: 450, color: 'rgba(200, 0, 100, 0.08)', r: 400 },
+            { x: 400, y: 300, color: 'rgba(100, 0, 255, 0.05)', r: 500 }
         ];
     },
 
-    drawBackground(ctx) {
-        // Deep Space Gradient
+    draw(ctx) {
+        // 1. Background Fill
         ctx.fillStyle = "#020208";
         ctx.fillRect(0,0,800,600);
 
-        // Draw Nebulas (Gradients)
+        // 2. Draw Procedural Nebulas
         this.nebulas.forEach(n => {
-            const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
-            g.addColorStop(0, n.color);
-            g.addColorStop(1, 'transparent');
-            ctx.fillStyle = g;
-            ctx.fillRect(0,0,800,600);
+            const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+            grad.addColorStop(0, n.color);
+            grad.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 800, 600);
         });
 
-        // Twinkling Embers
+        // 3. Draw Twinkling Star Dust
         ctx.fillStyle = "#fff";
         this.stars.forEach(s => {
-            s.y -= s.v; if(s.y < 0) s.y = 600;
-            const alpha = 0.3 + Math.abs(Math.sin(s.blink + Engine.frame * 0.02)) * 0.7;
+            s.y -= s.v; // Drift up
+            if(s.y < 0) s.y = 600;
+            
+            const alpha = 0.2 + Math.abs(Math.sin(s.blink + Engine.frame * 0.02)) * 0.8;
             ctx.globalAlpha = alpha;
             ctx.fillRect(s.x, s.y, s.size, s.size);
         });
         ctx.globalAlpha = 1.0;
+
+        // 4. Draw The Spaceship Crest (Centered behind title)
+        this.drawSpaceship(ctx);
     },
 
-    drawCrest(ctx) {
+    drawSpaceship(ctx) {
         ctx.save();
-        ctx.translate(400, 260); // Center of the crest
-        
-        // Shield Glow
-        ctx.shadowBlur = 40;
-        ctx.shadowColor = "rgba(255,255,255,0.2)";
-        
-        // Simple 16-bit Shield Outline
-        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.translate(400, 250); // Position behind title
+        ctx.rotate(-Math.PI / 12); // Octopath Style Tilt
+
+        // Engine Thrust Glow
+        const thrust = ctx.createRadialGradient(0, 50, 0, 0, 50, 60);
+        thrust.addColorStop(0, "rgba(0, 200, 255, 0.5)");
+        thrust.addColorStop(1, "transparent");
+        ctx.fillStyle = thrust;
+        ctx.fillRect(-60, -20, 120, 100);
+
+        // Ship Hull
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
         ctx.lineWidth = 2;
+        
         ctx.beginPath();
-        ctx.moveTo(0, -80);
-        ctx.lineTo(60, -60);
-        ctx.lineTo(60, 20);
-        ctx.lineTo(0, 80);
-        ctx.lineTo(-60, 20);
-        ctx.lineTo(-60, -60);
+        ctx.moveTo(0, -70);      // Nose
+        ctx.lineTo(25, 10);      // Right wing inner
+        ctx.lineTo(55, 45);      // Right wing tip
+        ctx.lineTo(15, 30);      // Right thruster outer
+        ctx.lineTo(0, 45);       // Rear center
+        ctx.lineTo(-15, 30);     // Left thruster outer
+        ctx.lineTo(-55, 45);     // Left wing tip
+        ctx.lineTo(-25, 10);     // Left wing inner
         ctx.closePath();
+        ctx.fill();
         ctx.stroke();
 
-        // The Sword (Octopath Italic Slash)
-        ctx.rotate(-Math.PI / 6);
-        ctx.fillStyle = "rgba(255,255,255,0.5)";
-        ctx.fillRect(-2, -100, 4, 200); // Blade
-        ctx.fillRect(-15, 60, 30, 4);   // Guard
-        
+        // Cockpit Glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#fff";
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(-3, -35, 6, 12);
+
+        // Thruster Emitters (Neon Blue)
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "cyan";
+        ctx.fillStyle = "cyan";
+        ctx.fillRect(-18, 32, 6, 6);
+        ctx.fillRect(12, 32, 6, 6);
+
         ctx.restore();
     }
 };
 
-// UI Handling
+// UI Interaction Logic
 document.querySelectorAll('.menu-btn').forEach(btn => {
     btn.addEventListener('mouseenter', () => btn.classList.add('active'));
     btn.addEventListener('mouseleave', () => btn.classList.remove('active'));
+    btn.addEventListener('click', (e) => {
+        const action = e.target.dataset.action;
+        console.log("Action Triggered:", action);
+        // Add scene transition logic here
+    });
 });
 
-// Fire the Engine
+// Boot Engine
 Engine.init();
+
 </script>
 </body>
 </html>
