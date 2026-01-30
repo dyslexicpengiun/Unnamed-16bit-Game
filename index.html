@@ -3,37 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>16-bit RPG - Matrix Edition</title>
+    <title>16-bit RPG - Perfect Transition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; }
-        #game-container { position: relative; width: 800px; height: 600px; margin: auto; border: 4px solid #333; }
-        canvas { display: block; }
+        body { margin: 0; overflow: hidden; background: #000; }
+        #game-container { position: relative; width: 800px; height: 600px; margin: auto; }
         
-        /* Updated Transition Layer */
-        #battle-transition {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: none;
-            z-index: 100;
-            background: black; /* Fallback */
-        }
+        /* The "Old" Scene */
+        #world-layer { position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        /* The "New" Scene (Hidden underneath) */
+        #battle-layer { position: absolute; top: 0; left: 0; z-index: 0; }
 
-        #matrix-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-
-        #ui-layer {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            text-shadow: 2px 2px #000;
+        /* The Masking Canvas */
+        #transition-canvas { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            z-index: 2; 
             pointer-events: none;
         }
     </style>
@@ -41,85 +27,85 @@
 <body>
 
 <div id="game-container">
-    <canvas id="gameCanvas"></canvas>
-    
-    <!-- Matrix Transition Overlay -->
-    <div id="battle-transition">
-        <canvas id="matrix-canvas"></canvas>
-    </div>
-
-    <div id="ui-layer">PRESS 'B' TO TEST BATTLE TRANSITION</div>
+    <!-- Battle scene is already there, just waiting behind -->
+    <canvas id="battle-layer"></canvas>
+    <!-- World scene is on top -->
+    <canvas id="world-layer"></canvas>
+    <!-- Masking layer -->
+    <canvas id="transition-canvas"></canvas>
 </div>
 
 <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = 800;
-    canvas.height = 600;
+    const worldCanvas = document.getElementById('world-layer');
+    const worldCtx = worldCanvas.getContext('2d');
+    const battleCanvas = document.getElementById('battle-layer');
+    const battleCtx = battleCanvas.getContext('2d');
+    const tCanvas = document.getElementById('transition-canvas');
+    const tCtx = tCanvas.getContext('2d');
 
-    // Simple Game Loop for background
-    function drawWorld() {
-        ctx.fillStyle = '#2d5e2d'; // Grass
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#fff';
-        ctx.fillText("Explore World...", 350, 300);
-        requestAnimationFrame(drawWorld);
+    [worldCanvas, battleCanvas, tCanvas].forEach(c => { c.width = 800; c.height = 600; });
+
+    // --- SETUP SCENES ---
+    function setupScenes() {
+        // Draw Overworld
+        worldCtx.fillStyle = '#2d5e2d'; 
+        worldCtx.fillRect(0,0,800,600);
+        worldCtx.fillStyle = 'white';
+        worldCtx.font = '30px Arial';
+        worldCtx.fillText("OVERWORLD (Current Scene)", 200, 300);
+
+        // Draw Battle (Hidden Beneath)
+        battleCtx.fillStyle = '#444';
+        battleCtx.fillRect(0,0,800,600);
+        battleCtx.fillStyle = 'red';
+        battleCtx.fillText("BATTLE (New Scene)", 250, 300);
     }
-    drawWorld();
+    setupScenes();
 
-    // --- MATRIX EFFECT LOGIC ---
-    const mCanvas = document.getElementById('matrix-canvas');
-    const mCtx = mCanvas.getContext('2d');
-    mCanvas.width = 800;
-    mCanvas.height = 600;
+    // --- MATRIX MASK LOGIC ---
+    const fontSize = 18;
+    const columns = tCanvas.width / fontSize;
+    const drops = Array(Math.floor(columns)).fill(0);
+    let transitionActive = false;
 
-    const characters = 'ｱｧｶｻﾀﾅﾊﾏﾔｬﾗﾜABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const fontSize = 16;
-    const columns = mCanvas.width / fontSize;
-    const drops = Array(Math.floor(columns)).fill(1);
-    let matrixInterval = null;
+    function dripTransition() {
+        if (!transitionActive) return;
 
-    function drawMatrix() {
-        mCtx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-        mCtx.fillRect(0, 0, mCanvas.width, mCanvas.height);
+        // The Magic Part: This makes the drops "erase" the top layer
+        worldCtx.globalCompositeOperation = 'destination-out';
         
-        mCtx.fillStyle = '#0F0';
-        mCtx.font = fontSize + 'px monospace';
+        worldCtx.font = fontSize + 'px monospace';
 
         for (let i = 0; i < drops.length; i++) {
-            const text = characters.charAt(Math.floor(Math.random() * characters.length));
-            mCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+            // Pick a random char
+            const text = String.fromCharCode(0x30A0 + Math.random() * 96);
+            
+            // Draw the char on the WORLD canvas using destination-out 
+            // This creates the transparent "holes" that reveal the battle layer
+            worldCtx.fillText(text, i * fontSize, drops[i] * fontSize);
 
-            if (drops[i] * fontSize > mCanvas.height && Math.random() > 0.975) {
+            if (drops[i] * fontSize > tCanvas.height && Math.random() > 0.95) {
                 drops[i] = 0;
             }
             drops[i]++;
         }
+
+        requestAnimationFrame(dripTransition);
     }
 
-    // --- TRIGGER FUNCTION ---
-    function startBattle() {
-        const transitionDiv = document.getElementById('battle-transition');
-        transitionDiv.style.display = 'block';
-        
-        // Reset drops
-        drops.fill(0);
-        
-        // Start animation
-        if(matrixInterval) clearInterval(matrixInterval);
-        matrixInterval = setInterval(drawMatrix, 35);
-
-        // End transition after 3 seconds
-        setTimeout(() => {
-            clearInterval(matrixInterval);
-            transitionDiv.style.display = 'none';
-            console.log("Battle Started!");
-        }, 3000);
-    }
-
-    // Event listener for testing
+    // Trigger on Key 'B'
     window.addEventListener('keydown', (e) => {
-        if (e.key.toLowerCase() === 'b') startBattle();
+        if (e.key.toLowerCase() === 'b' && !transitionActive) {
+            transitionActive = true;
+            dripTransition();
+            
+            // Clean up after it's fully revealed
+            setTimeout(() => {
+                transitionActive = false;
+                worldCtx.clearRect(0,0,800,600); // Fully clear top layer
+                console.log("Transition Complete");
+            }, 4000);
+        }
     });
 
 </script>
