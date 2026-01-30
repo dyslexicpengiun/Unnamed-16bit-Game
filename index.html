@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Alpha | 2D-HD Space RPG</title>
+    <title>Project Alpha | 2D-HD Starship Edition</title>
     <link href="https://fonts.googleapis.com" rel="stylesheet">
     <style>
-        :root { --glow: #fff; --bg: #010103; --cyan: #00f2ff; }
+        :root { --glow: #fff; --bg: #010103; --cyan: #00f2ff; --gold: #ffd700; }
         body { margin: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         #game-wrapper { position: relative; width: 800px; height: 600px; border: 1px solid #333; overflow: hidden; background: #000; box-shadow: 0 0 100px #000; }
         canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
@@ -14,26 +14,23 @@
         
         .ui-layer { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; color: white; }
         
-        /* RESTORED GLOWING TEXT */
         #main-title {
             font-family: 'Cinzel Decorative', serif; font-size: 54px; letter-spacing: 12px; margin: 0;
-            color: #fff;
-            text-shadow: 0 0 10px #fff, 0 0 20px var(--cyan), 0 0 40px var(--cyan);
-            z-index: 60;
-            animation: titlePulse 4s ease-in-out infinite;
+            color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan);
+            z-index: 60; animation: titlePulse 4s ease-in-out infinite;
         }
 
         @keyframes titlePulse {
-            0%, 100% { text-shadow: 0 0 10px #fff, 0 0 20px var(--cyan); }
-            50% { text-shadow: 0 0 20px #fff, 0 0 40px var(--cyan), 0 0 60px var(--cyan); }
+            0%, 100% { transform: scale(1); text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan); }
+            50% { transform: scale(1.02); text-shadow: 0 0 25px #fff, 0 0 50px var(--cyan); }
         }
 
         .menu-btn { 
             background: none; border: none; color: rgba(255,255,255,0.4); font-size: 22px; padding: 10px 40px; cursor: pointer; 
-            font-family: 'IBM Plex Mono', monospace; transition: 0.4s; letter-spacing: 4px; font-style: italic; width: 300px;
+            font-family: 'IBM Plex Mono', monospace; transition: 0.4s; letter-spacing: 4px; font-style: italic; width: 320px;
         }
-        .menu-btn:hover { color: #fff; text-shadow: 0 0 15px #fff; transform: translateX(15px); }
-        .menu-btn.active { color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan); border-left: 3px solid var(--cyan); }
+        .menu-btn:hover { color: #fff; text-shadow: 0 0 15px #fff; transform: translateX(20px); }
+        .menu-btn.active { color: #fff; text-shadow: 0 0 15px #fff, 0 0 30px var(--cyan); border-left: 4px solid var(--cyan); }
     </style>
 </head>
 <body>
@@ -43,7 +40,7 @@
     <canvas id="mainCanvas"></canvas>
     <div id="menu-layer" class="ui-layer">
         <h1 id="main-title">PROJECT ALPHA</h1>
-        <div class="menu-options" style="margin-top: 60px; display: flex; flex-direction: column; gap: 10px;">
+        <div class="menu-options" style="margin-top: 80px; display: flex; flex-direction: column; gap: 12px;">
             <button class="menu-btn" data-action="new-game">START JOURNEY</button>
             <button class="menu-btn" data-action="settings">OPTIONS</button>
             <button class="menu-btn" data-action="exit">EXIT</button>
@@ -72,74 +69,85 @@ const Engine = {
 const MenuSystem = {
     stars: [],
     init() {
-        for(let i=0; i<200; i++) {
-            this.stars.push({ x: Math.random()*800, y: Math.random()*600, s: Math.random()*2, b: Math.random()*10, v: Math.random()*0.4+0.1 });
+        for(let i=0; i<250; i++) {
+            this.stars.push({ x: Math.random()*800, y: Math.random()*600, s: Math.random()*2.5, b: Math.random()*10, v: Math.random()*0.5+0.1 });
         }
     },
     draw(ctx) {
-        // 1. Background
-        ctx.fillStyle = "#010105";
+        ctx.fillStyle = "#010108";
         ctx.fillRect(0,0,800,600);
 
-        // 2. Draw Ship FIRST (So we can define its area)
-        const shipArea = this.drawSpaceship(ctx);
+        // 1. Draw 16-Bit Starship Crest
+        this.drawStarship(ctx);
 
-        // 3. Draw Stars with Occlusion (Stars don't show through the ship hull)
+        // 2. Draw Dust with Ship Occlusion
         ctx.fillStyle = "#fff";
         this.stars.forEach(s => {
             s.y -= s.v; if(s.y < 0) s.y = 600;
-            const alpha = 0.2 + Math.abs(Math.sin(s.b + Engine.frame * 0.02)) * 0.8;
             
-            // Subtle logic: If star is within the ship's main body area, skip drawing
-            // This makes the ship feel solid
+            // SHIP COLLISION MASK: Don't render stars over the ship hull
             const dx = Math.abs(s.x - 400);
             const dy = Math.abs(s.y - 250);
-            if (dx < 60 && dy < 60) return; 
+            if (dx < 70 && dy < 75) return; 
 
+            const alpha = 0.2 + Math.abs(Math.sin(s.b + Engine.frame * 0.02)) * 0.8;
             ctx.globalAlpha = alpha;
             ctx.fillRect(s.x, s.y, s.s, s.s);
         });
         ctx.globalAlpha = 1.0;
     },
-    drawSpaceship(ctx) {
+    drawStarship(ctx) {
         ctx.save();
         ctx.translate(400, 250);
-        ctx.rotate(-Math.PI / 10);
+        ctx.rotate(-Math.PI / 15); // Slight cinematic tilt
 
-        // Engine Bloom
-        const grad = ctx.createRadialGradient(0, 50, 0, 0, 50, 70);
-        grad.addColorStop(0, "rgba(0, 242, 255, 0.4)");
-        grad.addColorStop(1, "transparent");
-        ctx.fillStyle = grad;
-        ctx.fillRect(-100, -50, 200, 150);
+        // ENGINE PLUME
+        const engineGlow = ctx.createRadialGradient(0, 45, 0, 0, 45, 85);
+        engineGlow.addColorStop(0, "rgba(0, 242, 255, 0.5)");
+        engineGlow.addColorStop(1, "transparent");
+        ctx.fillStyle = engineGlow;
+        ctx.fillRect(-120, 0, 240, 150);
 
-        // Ship Hull - Sharp 2D-HD Lines
-        ctx.strokeStyle = "rgba(0, 242, 255, 0.8)";
-        ctx.fillStyle = "rgba(10, 15, 30, 0.9)"; // Solid Dark Hull
+        // SHIP HULL (Dark Chrome Finish)
+        ctx.fillStyle = "#111827"; 
+        ctx.strokeStyle = "#4b5563";
         ctx.lineWidth = 2;
+        
         ctx.beginPath();
-        ctx.moveTo(0, -80);     // Nose
-        ctx.lineTo(25, 0);      // Wing root
-        ctx.lineTo(70, 50);     // Right Wing
-        ctx.lineTo(20, 30);     // Back
-        ctx.lineTo(0, 50);      // Center Engine
-        ctx.lineTo(-20, 30);
-        ctx.lineTo(-70, 50);    // Left Wing
-        ctx.lineTo(-25, 0);
+        ctx.moveTo(0, -90);      // Pointy Nose
+        ctx.lineTo(15, -40);     // Nose flare
+        ctx.lineTo(25, -20);     // Fuselage
+        ctx.lineTo(85, 40);      // Main Wing Tip Right
+        ctx.lineTo(30, 40);      // Wing Back Right
+        ctx.lineTo(20, 60);      // Engine Outer Right
+        ctx.lineTo(0, 50);       // Aft Center
+        ctx.lineTo(-20, 60);     // Engine Outer Left
+        ctx.lineTo(-30, 40);     // Wing Back Left
+        ctx.lineTo(-85, 40);     // Main Wing Tip Left
+        ctx.lineTo(-25, -20);
+        ctx.lineTo(-15, -40);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // Cockpit Glow
-        ctx.fillStyle = "#fff";
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = "#00f2ff";
-        ctx.fillRect(-4, -40, 8, 15);
+        // ARMOR PLATING / HIGHLIGHTS
+        ctx.strokeStyle = "rgba(255,255,255,0.1)";
+        ctx.beginPath();
+        ctx.moveTo(-15, -20); ctx.lineTo(15, -20);
+        ctx.moveTo(-20, 20); ctx.lineTo(20, 20);
+        ctx.stroke();
 
-        // Engine Cores
+        // NEON ACCENTS (Cyan glow strips)
         ctx.shadowBlur = 10;
-        ctx.fillRect(-22, 35, 6, 6);
-        ctx.fillRect(16, 35, 6, 6);
+        ctx.shadowColor = "#00f2ff";
+        ctx.fillStyle = "#00f2ff";
+        ctx.fillRect(-45, 25, 20, 2); // Left wing strip
+        ctx.fillRect(25, 25, 20, 2);  // Right wing strip
+        
+        // COCKPIT (Gold/Amber 16-bit glass)
+        ctx.shadowColor = "#ffd700";
+        ctx.fillStyle = "#ffd700";
+        ctx.fillRect(-6, -45, 12, 18);
 
         ctx.restore();
     }
