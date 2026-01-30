@@ -3,14 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>16-bit 2D-HD: Glowing Combat</title>
+    <title>16-bit 2D-HD Game Template | Reset Enabled</title>
     <style>
-        body { margin: 0; background: #010101; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        body { margin: 0; background: #050505; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         #shake-wrapper { position: relative; width: 800px; height: 600px; }
-        #game-container { 
-            position: relative; width: 100%; height: 100%; border: 2px solid #333; 
-            overflow: hidden; background: #000; box-shadow: 0 0 80px rgba(0,0,0,1); 
-        }
+        #game-container { position: relative; width: 100%; height: 100%; border: 2px solid #333; overflow: hidden; background: #000; box-shadow: 0 0 100px rgba(0,0,0,1); }
         canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
         #flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; pointer-events: none; z-index: 100; }
     </style>
@@ -41,113 +38,73 @@
     let transitionActive = false;
     let shakePower = 0;
 
-    // --- HSL ENTITIES ---
-    // H: Hue, S: Saturation, L: Lightness
-    const townNPCs = [
-        { x: 220, y: 440, h: 30, s: 100, l: 80 }, // Villager (Peach)
-        { x: 520, y: 410, h: 210, s: 100, l: 80 } // Merchant (Blue)
-    ];
-    const boss = { x: 380, y: 270, h: 0, s: 100, l: 50 }; // Boss (Red)
-
-    const particles = Array.from({ length: 45 }, () => ({ 
-        x: Math.random() * WIDTH, 
-        y: Math.random() * HEIGHT, 
-        v: Math.random() * 1.5 + 0.5 
-    }));
+    // ENTITIES
+    const townNPCs = [{ x: 220, y: 440, h: 45, s: 80, l: 70 }, { x: 520, y: 410, h: 200, s: 70, l: 60 }];
+    const bossEntity = { x: 380, y: 270, h: 0, s: 90, l: 50 };
+    const particles = Array.from({ length: 50 }, () => ({ x: Math.random() * WIDTH, y: Math.random() * HEIGHT, v: Math.random() * 1.8 + 0.4 }));
 
     function drawScene(ctx, type) {
         ctx.clearRect(0, 0, WIDTH, HEIGHT);
-        ctx.fillStyle = type === 'town' ? '#2d5a27' : '#0d0d0d';
+        ctx.fillStyle = type === 'town' ? '#254a21' : '#080808';
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
         
-        const chars = type === 'town' ? townNPCs : [boss];
-        
+        const chars = type === 'town' ? townNPCs : [bossEntity];
         chars.forEach(c => {
-            const bob = Math.sin(frame * 0.15) * 6;
-            const glowIntensity = 15 + Math.sin(frame * 0.1) * 10;
-            const pulseL = c.l + (Math.sin(frame * 0.2) * 10);
-
-            // 1. Anchored Shadow (No Glow)
+            const bob = Math.sin(frame * 0.12) * 6;
+            const pulseL = c.l + (Math.sin(frame * 0.2) * 12);
             ctx.shadowBlur = 0;
             ctx.fillStyle = 'rgba(0,0,0,0.4)';
-            ctx.beginPath(); ctx.ellipse(c.x + 20, c.y + 45, 18, 6, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(c.x + 20, c.y + 45, 20, 7, 0, 0, Math.PI * 2); ctx.fill();
 
-            // 2. Motion Blur + Glow
             for (let i = 2; i >= 0; i--) {
-                const ghostBob = Math.sin((frame - (i * 3)) * 0.15) * 6;
-                ctx.globalAlpha = i === 0 ? 1.0 : 0.2;
-                
-                // Set Glow on the main sprite (i=0)
-                if (i === 0) {
-                    ctx.shadowBlur = glowIntensity;
-                    ctx.shadowColor = `hsl(${c.h}, ${c.s}%, ${pulseL}%)`;
-                } else {
-                    ctx.shadowBlur = 0;
-                }
-
+                const ghostBob = Math.sin((frame - (i * 3)) * 0.12) * 6;
+                ctx.globalAlpha = i === 0 ? 1.0 : 0.25;
+                if (i === 0) { ctx.shadowBlur = 15; ctx.shadowColor = `hsl(${c.h}, ${c.s}%, ${pulseL}%)`; }
                 ctx.fillStyle = `hsl(${c.h}, ${c.s}%, ${pulseL}%)`;
                 ctx.fillRect(c.x, c.y + ghostBob, 40, 45);
             }
         });
-        
-        // Reset Glow for other elements
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1.0;
+        ctx.fillStyle = type === 'town' ? 'rgba(255,255,200,0.3)' : 'rgba(255,80,0,0.7)';
+        particles.forEach(p => { p.y -= p.v; if (p.y < 0) p.y = HEIGHT; ctx.fillRect(p.x, p.y, 2, 2); });
 
-        // Embers
-        ctx.fillStyle = type === 'town' ? 'rgba(255,255,255,0.4)' : 'rgba(255,100,50,0.8)';
-        particles.forEach(p => { 
-            p.y -= p.v; if (p.y < 0) p.y = HEIGHT; 
-            ctx.fillRect(p.x, p.y, 2, 2); 
-        });
-
-        // UI Glow
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = type === 'town' ? '#fff' : '#f00';
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-        ctx.fillRect(40, 20, 720, 60);
-        ctx.strokeStyle = type === 'town' ? '#fff' : '#f00';
-        ctx.strokeRect(45, 25, 710, 50);
-        ctx.shadowBlur = 0;
-
-        ctx.fillStyle = '#fff';
+        // UI
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(40, 20, 720, 65);
+        ctx.strokeStyle = type === 'town' ? '#ffffff' : '#ff3300';
+        ctx.strokeRect(45, 25, 710, 55);
+        ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 16px monospace';
-        ctx.fillText(type === 'town' ? "> TOWN: [B] TO BATTLE" : "> BOSS FIGHT: DETECTED", 70, 55);
+        const status = type === 'town' ? "TOWN [B] BATTLE" : "BATTLE [R] RESET";
+        ctx.fillText(`> STATUS: ${status}`, 75, 58);
     }
 
     function mainLoop() {
         frame++;
         drawScene(battleCtx, 'battle'); 
 
-        // Shake Logic
         if (shakePower > 0.1) {
             const x = (Math.random() - 0.5) * shakePower;
             const y = (Math.random() - 0.5) * shakePower;
             shakeWrapper.style.transform = `translate(${x}px, ${y}px)`;
-            shakePower *= 0.92;
-        } else {
-            shakeWrapper.style.transform = `translate(0,0)`;
-        }
+            shakePower *= 0.91;
+        } else { shakeWrapper.style.transform = `translate(0,0)`; }
 
         if (!transitionActive) {
             drawScene(worldCtx, 'town'); 
         } else {
             const stripWidth = 4;
-            const columns = Math.ceil(WIDTH / stripWidth) + 60;
+            const columns = Math.ceil(WIDTH / stripWidth) + 65;
             for (let i = 0; i < columns; i++) {
                 if (drops[i] < HEIGHT) {
-                    const xCurrent = ((i * stripWidth) - 150) + (drops[i] / 2.5);
-                    
-                    // Chromatic Drip
+                    const xCurrent = ((i * stripWidth) - 150) + (drops[i] / 3);
                     worldCtx.globalCompositeOperation = 'screen';
-                    worldCtx.globalAlpha = 0.4;
+                    worldCtx.globalAlpha = 0.5;
                     worldCtx.drawImage(battleCanvas, xCurrent + 3, drops[i], stripWidth, 15, xCurrent + 3, drops[i], stripWidth, 15);
                     worldCtx.drawImage(battleCanvas, xCurrent - 3, drops[i], stripWidth, 15, xCurrent - 3, drops[i], stripWidth, 15);
-                    
                     worldCtx.globalCompositeOperation = 'source-over';
                     worldCtx.globalAlpha = 1.0;
                     worldCtx.drawImage(battleCanvas, xCurrent, drops[i], stripWidth, 15, xCurrent, drops[i], stripWidth, 15);
-                    
                     drops[i] += speeds[i];
                 }
             }
@@ -155,19 +112,25 @@
         requestAnimationFrame(mainLoop);
     }
 
-    const drops = new Array(Math.ceil(WIDTH / 4) + 60).fill(0);
+    const drops = new Array(Math.ceil(WIDTH / 4) + 65).fill(0);
     let speeds = [];
 
     window.addEventListener('keydown', (e) => {
-        if (e.key.toLowerCase() === 'b' && !transitionActive) {
+        const key = e.key.toLowerCase();
+        if (key === 'b' && !transitionActive) {
             flashEl.style.transition = "none";
             flashEl.style.opacity = "1";
-            setTimeout(() => { flashEl.style.transition = "opacity 1.2s ease-out"; flashEl.style.opacity = "0"; }, 50);
-            
-            shakePower = 20; 
+            setTimeout(() => { flashEl.style.transition = "opacity 1.5s ease-out"; flashEl.style.opacity = "0"; }, 50);
+            shakePower = 25; 
             drops.fill(0);
             speeds = Array.from({ length: drops.length }, () => Math.random() * 11 + 7);
             transitionActive = true;
+        }
+        // RESET LOGIC
+        if (key === 'r') {
+            transitionActive = false;
+            worldCtx.clearRect(0,0,WIDTH,HEIGHT);
+            console.log("System Reset: Returned to Town");
         }
     });
 
