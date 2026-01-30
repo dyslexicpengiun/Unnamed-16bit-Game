@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>16-bit 2D-HD: UI Drip Edition</title>
+    <title>16-bit 2D-HD: Motion Blur & UI Drip</title>
     <style>
         body { margin: 0; background: #050505; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        #game-container { position: relative; width: 800px; height: 600px; border: 2px solid #222; overflow: hidden; }
+        #game-container { position: relative; width: 800px; height: 600px; border: 2px solid #222; overflow: hidden; background: #000; }
         canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
         #flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; pointer-events: none; z-index: 100; }
     </style>
@@ -32,14 +32,14 @@
 
     let frame = 0;
     let transitionActive = false;
-    const stripWidth = 4; // Smaller strips for smoother angled look
-    const columns = Math.ceil(WIDTH / stripWidth) + 40; // Extra columns for angled offset
+    const stripWidth = 4;
+    const columns = Math.ceil(WIDTH / stripWidth) + 60; 
     let drops = new Array(columns).fill(0);
     let speeds = new Array(columns).fill(0);
-    let windAngle = 2; // Horizontal shift per vertical step
+    const windAngle = 3; 
 
     const townNPCs = [{ x: 200, y: 450, color: '#ffccaa' }, { x: 550, y: 420, color: '#aaccff' }];
-    const particles = Array.from({ length: 40 }, () => ({ x: Math.random() * WIDTH, y: Math.random() * HEIGHT, v: Math.random() * 0.5 + 0.2 }));
+    const particles = Array.from({ length: 40 }, () => ({ x: Math.random() * WIDTH, y: Math.random() * HEIGHT, v: Math.random() * 0.8 + 0.3 }));
 
     function drawScene(ctx, type) {
         ctx.clearRect(0, 0, WIDTH, HEIGHT);
@@ -47,28 +47,43 @@
         ctx.fillRect(0, 0, WIDTH, HEIGHT);
         
         const chars = type === 'town' ? townNPCs : [{ x: 380, y: 280, color: '#ff4444' }];
+        
         chars.forEach(c => {
-            const bob = Math.sin(frame * 0.15) * 4;
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.beginPath(); ctx.ellipse(c.x + 20, c.y + 45, 18, 6, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = c.color;
-            ctx.fillRect(c.x, c.y + bob, 40, 45);
+            // --- MOTION BLUR LOGIC ---
+            // Draw 3 ghosts behind the current bob position
+            for (let i = 3; i >= 0; i--) {
+                const ghostFrame = frame - (i * 2);
+                const ghostBob = Math.sin(ghostFrame * 0.15) * 6;
+                const opacity = 1 - (i * 0.25);
+                
+                if (i === 0) { // The actual character
+                    // Anchored Shadow
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    ctx.beginPath(); ctx.ellipse(c.x + 20, c.y + 45, 18, 6, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = c.color;
+                } else { // The blur trails
+                    ctx.fillStyle = c.color.replace(')', `, ${opacity})`).replace('#', 'rgba('); // Simple opacity hack
+                    // For hex colors, we just use a globalAlpha for simplicity:
+                    ctx.globalAlpha = opacity * 0.3;
+                }
+                
+                ctx.fillRect(c.x, c.y + ghostBob, 40, 45);
+                ctx.globalAlpha = 1.0;
+            }
         });
 
-        // Pixel Embers
-        ctx.fillStyle = type === 'town' ? 'rgba(255,255,255,0.3)' : 'rgba(255,100,0,0.5)';
+        // Embers
+        ctx.fillStyle = type === 'town' ? 'rgba(255,255,255,0.3)' : 'rgba(255,100,0,0.6)';
         particles.forEach(p => { p.y -= p.v; if (p.y < 0) p.y = HEIGHT; ctx.fillRect(p.x, p.y, 2, 2); });
 
-        // --- DRAW UI DIRECTLY ON CANVAS ---
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        // --- UI (Drippable) ---
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(50, 20, 700, 60);
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = type === 'town' ? '#fff' : '#ff4444';
         ctx.strokeRect(55, 25, 690, 50);
         ctx.fillStyle = '#fff';
-        ctx.font = '20px monospace';
-        const msg = type === 'town' ? "VILLAGE: PRESS 'B' TO FIGHT!" : "DANGER: BOSS ENCOUNTER!";
-        ctx.fillText(msg, 100, 55);
+        ctx.font = 'bold 18px monospace';
+        ctx.fillText(type === 'town' ? "> VILLAGE: [B] TO ENGAGE" : "> ENCOUNTER: BOSS DETECTED", 80, 55);
     }
 
     function mainLoop() {
@@ -80,14 +95,14 @@
         } else {
             for (let i = 0; i < columns; i++) {
                 if (drops[i] < HEIGHT) {
-                    const xOrigin = (i * stripWidth) - 100; // Start offset for wind
+                    const xOrigin = (i * stripWidth) - 150; 
                     const currentY = drops[i];
-                    const xCurrent = xOrigin + (currentY / windAngle); // Calculate angled X
+                    const xCurrent = xOrigin + (currentY / windAngle); 
                     
                     worldCtx.drawImage(
                         battleCanvas, 
-                        xCurrent, currentY, stripWidth, speeds[i] + 4, 
-                        xCurrent, currentY, stripWidth, speeds[i] + 4
+                        xCurrent, currentY, stripWidth, speeds[i] + 5, 
+                        xCurrent, currentY, stripWidth, speeds[i] + 5
                     );
                     drops[i] += speeds[i];
                 }
@@ -100,10 +115,13 @@
         if (e.key.toLowerCase() === 'b' && !transitionActive) {
             flashEl.style.transition = "none";
             flashEl.style.opacity = "1";
-            setTimeout(() => { flashEl.style.transition = "opacity 0.6s"; flashEl.style.opacity = "0"; }, 50);
+            setTimeout(() => { 
+                flashEl.style.transition = "opacity 0.8s ease-out"; 
+                flashEl.style.opacity = "0"; 
+            }, 40);
             
             drops.fill(0);
-            speeds = Array.from({ length: columns }, () => Math.random() * 7 + 5);
+            speeds = Array.from({ length: columns }, () => Math.random() * 9 + 6);
             transitionActive = true;
         }
     });
